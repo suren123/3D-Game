@@ -1,51 +1,51 @@
-# Codex 多 Agent 中文配置包
+# 项目 Agent 使用说明
 
-本配置包提供项目级工作规则和一个可复用的多 Agent 协作 Skill。
+本项目使用 [AGENTS.md](../AGENTS.md) 作为常驻规则，通过显式路径读取两个工作流程 Skill：
 
-## 文件结构
+| 文件 | 用途 |
+| --- | --- |
+| [multi-agent-dev](../.agents/skills/multi-agent-dev/SKILL.md) | 任务拆分、委派、交接、失败处理和整合审查 |
+| [game-development](../.agents/skills/game-development/SKILL.md) | 游戏需求、选型、开发闭环、试玩和性能验证 |
 
-```text
-项目根目录/
-├── AGENTS.md
-└── .agents/
-    └── skills/
-        └── multi-agent-dev/
-            └── SKILL.md
-```
+## 自动加载与实际能力
 
-## 安装方法
+把仓库作为工作目录，并在任务开始时读取 AGENTS.md。不同客户端对项目指令与 Skill 自动发现的支持可能不同；无法确认自动加载时，直接要求读取上述文件，无需每次粘贴整套规则。
 
-1. 将 `AGENTS.md` 放到 GitHub 仓库或项目的根目录。
-2. 将 `multi-agent-dev` 文件夹放到项目根目录的 `.agents/skills/` 下。
-3. 确认最终路径为：
-   - `项目根目录/AGENTS.md`
-   - `项目根目录/.agents/skills/multi-agent-dev/SKILL.md`
-4. 将文件提交到项目仓库，并在新的 Codex 任务中使用该项目。
+这些文件是工作规则，不是 Agent 运行时或调度服务。必须以当前会话实际提供的原生工具和权限为准；工具存在不等于调用已成功。子 Agent 可能共享工作区，独立 Cloud 任务也可能完全隔离，应在开始时核对。
 
-## 使用方法
+## 日常用法
 
-自动模式：
+默认 AUTO，不必每次指定角色或数量：
 
 ```text
-请使用 multi-agent-dev 技能，MODE=AUTO。根据任务复杂度决定是否启用多 Agent，并完成实现、测试和交付。
+请阅读项目 AGENTS.md，按默认 AUTO 模式完成本次任务：
+<目标、范围与验收条件>
 ```
 
-手动模式：
+明确要求协作时：
 
 ```text
-请使用 multi-agent-dev 技能，MODE=MANUAL。安排 Explorer、Architect、Developer、Reviewer 四个角色，按职责执行。
+请使用 multi-agent-dev，MODE=AUTO。
+对本次复杂任务按项目规则实际委派，明确文件所有权，整合后验证并交付。
+任务：<目标、范围与验收条件>
 ```
 
-单 Agent 模式：
+只做单 Agent 工作时：
 
 ```text
-请使用 multi-agent-dev 技能，MODE=SINGLE。由你独立完成任务，不创建子 Agent。
+MODE=SINGLE。请完成 <任务>，不要创建子 Agent。
 ```
 
-## 重要说明
+MANUAL 可以指定角色、文件范围和依赖；角色数量不等于必须同时运行的数量。默认最多同时运行 3 个子 Agent，实际仍受平台容量限制。
 
-- `AGENTS.md` 提供项目级指令；Skill 提供可重复调用的协作流程。
-- 配置文件本身不会为 Cloud 环境增加原本不存在的原生 Subagents 能力。
-- 如果当前任务环境没有原生子 Agent 创建和结果回收能力，主 Agent 必须如实说明；可以生成独立 Cloud 任务提示词，但不能声称这些任务已经启动。
-- 多个独立 Cloud 任务通常有各自的工作区。请通过分支、提交、补丁或明确的文件交接整合结果，不要假设它们自动共享文件。
-- 第一次使用时，建议先执行只读能力验证任务，再将其用于大型开发。
+## 验证是否真正生效
+
+一次适合委派的任务，应能看到真实的创建和结果回收记录，并在最终报告中看到实际分工与验证结果。仅出现角色名称或分工文字不能证明执行了多 Agent。
+
+工具不可用时，主 Agent 应说明限制并完成能完成的部分，不伪造执行。复杂长任务按需维护 `docs/task-state.md`，恢复时以实际文件和 Git 状态核对记录。
+
+## 本项目当前边界
+
+先明确游戏需求，由主 Agent 完成引擎和框架选型，再建立开发工程。游戏 Skill 不指定技术栈，也不要求当前安装依赖或创建资源目录。
+
+本配置由最初上传的协作文档按项目需要修订；原始版本可通过 Git 历史查看。后续以 AGENTS.md 为项目约束来源，以各 Skill 为对应流程来源，避免重复维护相同规则。
