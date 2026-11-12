@@ -106,3 +106,5 @@
 - 官方预览、同种子前后截图、造型与材质对照见[官方画面对照](kenney-visual-reference.md)。
 
 以上为云端Chromium/SwiftShader实际执行结果，不代表iPad Air 4硬件帧率或Safari真机验收。完整50包保留在云端素材库，游戏只前置加载实际使用资源。正式站结果以部署后的实测记录为准。
+
+发布完成：功能提交 `09c4fc189b0cd0b92ad8d53caec143b267da9f88` 已推送main，[Actions 43275476204](https://github.com/suren123/3D-Game/actions/runs/43275476204) 的构建与Pages部署均成功。正式站HTTP200，实测加载 `assets/index-Cfx3VQlw.js`；`python tests/v2_live.py` 使用真实线上HTTPS响应验证全部32模型、15实物图标、48语音，实际Canvas点击完成商店配送，装卸清理、图鉴缩放与返回通过，ready后无新增资源请求、无页面错误。原始记录位于忽略提交的artifacts/v2/live-mini-verification.json。本轮工作完成，无继续运行的实现子Agent。许可证保持原文件CRLF及空白，其他改动空白检查通过。

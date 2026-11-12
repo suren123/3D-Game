@@ -91,3 +91,5 @@ GitHub Actions运行43212030141成功，https://suren123.github.io/3D-Game/ 已�
 整合进展：两个子Agent已停止写入。32模型/15图标/51音频/2外部纹理，100运行文件4480057字节；30项Node测试通过。真实Chromium在海边商店、农场学校、晴天医院完成离线配送（学校触摸实物、医院鼠标实物），10次换图无孤立网格/新请求；施工围栏/锥桶展示、绕行配送和重置清理通过。修复过路口导入朝向与装饰过度避让。最终仅Nature三件旧植被将源metallic=1纠正为哑光，正在新构建跑全32模型图鉴；完成后提交发布及正式站复测。截图与报告在artifacts/kenney，官方对照在docs/kenney-visual-reference.md。
 
 最终32模型图鉴回归已通过，生产构建index-Cfx3VQlw.js；最终截图与官方对照已入文档。本地验收完成，当前进入提交/Pages发布及真实线上响应配送验证阶段。两名子Agent均已结束写入，后续由主Agent完成。
+
+发布完成：功能提交 `09c4fc189b0cd0b92ad8d53caec143b267da9f88` 已推送main，[Actions 43275476204](https://github.com/suren123/3D-Game/actions/runs/43275476204) 的构建与Pages部署均成功。正式站HTTP200，实测加载 `assets/index-Cfx3VQlw.js`；`python tests/v2_live.py` 使用真实线上HTTPS响应验证全部32模型、15实物图标、48语音，实际Canvas点击完成商店配送，装卸清理、图鉴缩放与返回通过，ready后无新增资源请求、无页面错误。原始记录位于忽略提交的artifacts/v2/live-mini-verification.json。本轮工作完成，无继续运行的实现子Agent。许可证保持原文件CRLF及空白，其他改动空白检查通过。
