@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+"""Regression for map labels and actual 3D buildings (never uses destination menu)."""
+import asyncio,json
+from playwright.async_api import async_playwright
+from v2_browser import OUT,URL,snap,state,click,prepare,fill,phase,center
+async def run():
+ OUT.mkdir(parents=True,exist_ok=True);results=[];errors=[]
+ async with async_playwright() as w:
+  browser=await w.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
+  for width,height,dpr,touch in [(1180,820,1,False),(1180,820,2,True),(1366,1024,1,False)]:
+   ctx=await browser.new_context(viewport={'width':width,'height':height},device_scale_factor=dpr,has_touch=True)
+   p=await ctx.new_page();p.on('pageerror',lambda e:errors.append(str(e)))
+   await p.goto(URL+'?test=1&seed=11');await p.wait_for_function('window.__townTest?.snapshot().ready',timeout=120000)
+   await click(p,'start');await prepare(p);await fill(p);await click(p,'depart');await p.wait_for_timeout(350)
+   # Drag out of a map label must not turn into a trip.
+   x,y=await center(p,'place-cafe');await p.mouse.move(x,y);await p.mouse.down();await p.mouse.move(15,400,steps=8);await p.mouse.up()
+   assert (await state(p))['phase']=='explore'
+   await click(p,'hint');await p.mouse.click(x,y);assert (await state(p))['paused']
+   await click(p,'close-hint');await p.wait_for_timeout(250)
+   points={v['id']:v for v in (await snap(p))['places']};body=points['school']['building']
+   # Ensure this test really taps the building below the label, not its GUI button.
+   box=(await snap(p))['bounds']['place-school']
+   assert not(box['x']<=body['x']<=box['x']+box['width'] and box['y']<=body['y']<=box['y']+box['height']),(box,body)
+   if touch:await p.touchscreen.tap(body['x'],body['y'])
+   else:await p.mouse.click(body['x'],body['y'])
+   await phase(p,'moving');assert (await state(p))['currentDestination']=='school'
+   await phase(p,'delivery');assert (await state(p))['location']=='school'
+   await click(p,'overview');await p.wait_for_timeout(2500)
+   x,y=await center(p,'place-cafe')
+   if touch:await p.touchscreen.tap(x,y)
+   else:await p.mouse.click(x,y)
+   await phase(p,'moving');assert (await state(p))['currentDestination']=='cafe'
+   await phase(p,'delivery')
+   for _ in range(2):await click(p,'deliver-flowers')
+   await phase(p,'reward')
+   assert (await state(p))['rewardCount']==1
+   results.append({'viewport':[width,height],'dpr':dpr,'touch':touch,'building':'school','label':'cafe','completed':True})
+   print('PASS direct map building + label + delivery',width,height,dpr,touch,flush=True)
+   await p.screenshot(path=str(OUT/f'map-input-{width}-{dpr}.png'));await ctx.close()
+  assert not errors,errors
+  (OUT/'map-input.json').write_text(json.dumps({'checks':results,'errors':errors},indent=2));await browser.close()
+asyncio.run(run())

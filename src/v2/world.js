@@ -10,6 +10,9 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { PointerEventTypes } from '@babylonjs/core/Events/pointerEvents.js';
 import { SolidParticleSystem } from '@babylonjs/core/Particles/solidParticleSystem.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
+// Scene.pick is a warning-only stub until this side-effect registers ray picking.
+// Keep it explicit when importing individual engine modules.
+import '@babylonjs/core/Culling/ray.js';
 import { GOODS, PLACES, VEHICLES } from './catalog.js';
 
 // The world only presents rules state. Models arrive fully parsed in the asset
@@ -313,7 +316,10 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     return map.places.map(place=>{
       const p=placement.get(place.id);
       const projected=Vector3.Project(new Vector3(p.x,place.id==='park'?1.6:3.7,p.z),Matrix.Identity(),scene.getTransformMatrix(),viewport);
-      return {id:place.id,x:projected.x/w*rect.width,y:projected.y/h*rect.height,visible:projected.z>=0&&projected.z<=1&&projected.x>=0&&projected.x<=w&&projected.y>=0&&projected.y<=h};
+      const building=Vector3.Project(new Vector3(p.x,.8,p.z),Matrix.Identity(),scene.getTransformMatrix(),viewport);
+      return {id:place.id,x:projected.x/w*rect.width,y:projected.y/h*rect.height,
+        building:{x:building.x/w*rect.width,y:building.y/h*rect.height},
+        visible:projected.z>=0&&projected.z<=1&&projected.x>=0&&projected.x<=w&&projected.y>=0&&projected.y<=h};
     });
   }
   let pressed=null;

@@ -146,7 +146,7 @@ window.addEventListener('pagehide',()=>audio?.stop());
 document.querySelector('#graphics-error button').addEventListener('click',()=>location.reload());
 if(testMode)Object.defineProperty(window,'__townTest',{value:Object.freeze({
   snapshot:()=>({state:game.getState(),ready,started,resources:resources?.stats,audio:audio?.stats(),world:world?.getState(),
-    bounds:ui?.getBounds(),settings:{...settings},frames:frameCount,manifest:RESOURCE_MANIFEST,
+    bounds:ui?.getBounds(),places:world?.projectPlaces(),settings:{...settings},frames:frameCount,manifest:RESOURCE_MANIFEST,
     vehicleMaterials:scene?.meshes.filter(m=>m.name.startsWith(`${game.getState().vehicleId}:`)&&m.material).map(m=>({name:m.name,lights:m._lightSources?.length,
       kind:m.material.getClassName(),color:m.material.albedoColor?.asArray(),textureReady:m.material.albedoTexture?.isReady(),enabled:m.isEnabled()})),
     render:{width:engine?.getRenderWidth(),height:engine?.getRenderHeight(),meshes:scene?.meshes.length,materials:scene?.materials.length,textures:scene?.textures.length,

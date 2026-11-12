@@ -209,8 +209,12 @@ export function createUI(scene, callbacks = {}) {
   function setup() {
     if (screen) screen.dispose();
     buttons.clear(); armed.clear(); markers = new Map();
-    screen = new Container('ui-screen'); screen.width = '100%'; screen.height = '100%'; screen.zIndex = 1; texture.addControl(screen);
-    frame = new Container('ui-frame'); frame.width = `${W}px`; frame.height = `${H}px`; screen.addControl(frame);
+    screen = new Container('ui-screen'); screen.width = '100%'; screen.height = '100%'; screen.zIndex = 1;
+    screen.isHitTestVisible = false; texture.addControl(screen);
+    frame = new Container('ui-frame'); frame.width = `${W}px`; frame.height = `${H}px`;
+    // Containers still traverse their children, but their empty area must not
+    // consume input before the lower map-marker layer gets to test its buttons.
+    frame.isHitTestVisible = false; screen.addControl(frame);
   }
   function shade() {
     const s = new Rectangle('modal-shade'); s.width = '100%'; s.height = '100%'; s.background = '#254e43'; s.alpha = .35; s.thickness = 0; s.isPointerBlocker = true;
@@ -301,7 +305,7 @@ export function createUI(scene, callbacks = {}) {
     button(card, 'depart', '装好了，出发！', 574, 551, 390, 72, () => send('DEPART'), { fill: C.teal, ink: C.white, icon: 'car' });
   }
   function makeMarkers() {
-    markersLayer = new Container('map-places'); markersLayer.width = '100%'; markersLayer.height = '100%'; screen.addControl(markersLayer);
+    markersLayer = new Container('map-places'); markersLayer.width = '100%'; markersLayer.height = '100%'; markersLayer.isHitTestVisible = false; screen.addControl(markersLayer);
     const enable = ['explore', 'delivery'].includes(lastState?.phase) && !lastState.paused && !panel;
     markersLayer.isVisible = enable;
     for (const place of PLACES) {
