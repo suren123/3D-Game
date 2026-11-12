@@ -2,6 +2,14 @@
 
 适合 4–6 岁儿童的 2.5D 斜俯视汽车小镇网页原型，优先为 iPad 横屏设计。点击地点或底部大按钮，汽车沿道路自动行驶，到站帮个小忙，收集快乐贴纸。
 
+## 在线试玩
+
+**https://suren123.github.io/3D-Game/**
+
+用 iPad Safari 横屏打开即可试玩。声音由首次点击后启用，可用右上角开关关闭；真实设备表现仍需试玩确认。
+
+仓库使用 GitHub Actions 自动部署：每次推送到 `main`（或手动运行 Deploy GitHub Pages）后，Node 24 安装锁定依赖、运行逻辑测试、构建并发布 `dist/`。发布状态见 [部署记录](https://github.com/suren123/3D-Game/actions/workflows/pages.yml)。没有自定义域名或额外部署密钥。
+
 ## 原型内容
 
 - 三个双步骤任务：送面包、送小花、洗洗车；可切换、重复，无倒计时或扣分。
