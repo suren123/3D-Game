@@ -118,30 +118,27 @@ function position(control, x, y, width, height) {
 
 export function createUI(scene, callbacks = {}) {
   const { onCommand = () => {}, onSpeak = () => {}, onSound = () => {}, onOverview = () => {}, onReducedMotion = () => {}, onNewSession = () => {} } = callbacks;
+  const WORLD_W = 860, PANEL_W = W - WORLD_W, CARD_W = PANEL_W - 24;
   const texture = AdvancedDynamicTexture.CreateFullscreenUI('town-ui', true, scene);
-  // Fit the entire logical frame. Babylon's useSmallestIdeal chooses the shorter
-  // physical axis, which can crop this landscape frame on a different aspect.
   texture.useSmallestIdeal = false;
-  const engine = scene.getEngine();
+  const engine = scene.getEngine(), canvas = engine.getRenderingCanvas();
   const fitTexture = () => {
     const wide = engine.getRenderWidth() / engine.getRenderHeight() > W / H;
-    texture.idealWidth = wide ? 0 : W; texture.idealHeight = wide ? H : 0;
+    texture.idealWidth = wide ? 0 : W;
+    texture.idealHeight = wide ? H : 0;
   };
   fitTexture();
-  const resizeObserver = engine.onResizeObservable.add(fitTexture);
+  const resizeObserver = engine.onResizeObservable.add(() => { fitTexture(); applyPlaces(); });
   texture.rootContainer.isPointerBlocker = false;
   let screen, frame, markersLayer, lastState = null, panel = null, priorPaused = false;
   let mode = 'loading', loadingState = { progress: 0, text: '小镇正在准备，请稍等一会儿。' };
   let sound = true, reducedMotion = false, historicalCount = 0, chosenDifficulty = 'easy', lastSignature = '';
-  let projected = [], disposed = false, markers = new Map();
+  let projected = [], disposed = false, orientationBlocked = false, vehiclePage = 0, markers = new Map();
   const buttons = new Map(), armed = new Set();
-  const canvas = scene.getEngine().getRenderingCanvas();
   const sparkles = new ClickSparkles();
   sparkles.width = '100%'; sparkles.height = '100%'; sparkles.zIndex = 100;
   texture.addControl(sparkles);
   const cancelPress = () => {
-    // Clear our acceptance gate before GUI releases: its forced release may
-    // notify click observers, but a canceled gesture must never run an action.
     armed.clear();
     for (const b of buttons.values()) b.background = b._townBaseFill;
     for (const [pointerId, control] of Object.entries(texture._lastControlDown)) {
@@ -151,54 +148,81 @@ export function createUI(scene, callbacks = {}) {
     texture._capturedPointerIds.clear();
   };
   const secondPointer = e => { if (e.isPrimary === false) cancelPress(); };
+  const cancelOutside = event => {
+    if (!armed.size) return;
+    const rect = canvas?.getBoundingClientRect(), size = texture.getSize();
+    if (!rect?.width || !rect.height) { armed.clear(); return; }
+    const x = (event.clientX - rect.left) * size.width / rect.width;
+    const y = (event.clientY - rect.top) * size.height / rect.height;
+    for (const b of armed) {
+      const m = b._currentMeasure;
+      // A rebuild can leave Babylon's hover owner at the root while a button
+      // owns the press. Check the actual pointer before GUI move/up handling,
+      // so leaving the touch target always cancels, even without a GUI out.
+      if (!m || x < m.left || x > m.left + m.width || y < m.top || y > m.top + m.height) {
+        armed.delete(b); b.background = b._townBaseFill;
+      }
+    }
+  };
+  canvas?.addEventListener('pointermove', cancelOutside, true);
+  canvas?.addEventListener('pointerup', cancelOutside, true);
   canvas?.addEventListener('pointercancel', cancelPress, true);
-  canvas?.addEventListener('pointerdown', secondPointer, true);
+  // The second contact may land in the safe-area gutter or on the HTML edge.
+  canvas?.ownerDocument?.addEventListener('pointerdown', secondPointer, true);
   canvas?.addEventListener('lostpointercapture', cancelPress, true);
   const tick = scene.onBeforeRenderObservable.add(() => {
-    if (!lastState?.paused && !reducedMotion) sparkles.tick(Math.min(scene.getEngine().getDeltaTime() / 1000, .05));
+    if (!orientationBlocked && !lastState?.paused && !reducedMotion) sparkles.tick(Math.min(engine.getDeltaTime() / 1000, .05));
   });
 
-  function box(parent, name, x, y, w, h, background = C.cream, radius = 26) {
+  function box(parent, name, x, y, w, h, background = C.cream, radius = 20) {
     const r = position(new Rectangle(name), x, y, w, h);
     r.background = background; r.thickness = 0; r.cornerRadius = radius; r.isHitTestVisible = false;
     parent.addControl(r); return r;
   }
-  function text(parent, words, x, y, w, h, size = 26, color = C.ink, align = 'left', bold = false) {
+  function text(parent, words, x, y, w, h, size = 24, color = C.ink, align = 'left', bold = false) {
     const t = position(new TextBlock(`text-${String(words).slice(0, 16)}`, words), x, y, w, h);
     t.color = color; t.fontSize = size; t.fontFamily = '"PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
-    t.fontWeight = bold ? '700' : '500'; t.textWrapping = true; t.lineSpacing = '5px';
+    t.fontWeight = bold ? '700' : '500'; t.textWrapping = true; t.wordDivider = ''; t.lineSpacing = '3px';
     t.textHorizontalAlignment = align === 'center' ? Control.HORIZONTAL_ALIGNMENT_CENTER : Control.HORIZONTAL_ALIGNMENT_LEFT;
     t.isHitTestVisible = false; parent.addControl(t); return t;
   }
   function icon(parent, kind, x, y, size, tint) { const a = position(new ToyIcon(kind, tint), x, y, size, size); parent.addControl(a); return a; }
   function button(parent, id, label, x, y, w, h, action, options = {}) {
     const b = position(new Button(id), x, y, w, h);
-    b.cornerRadius = options.radius ?? 22; b.thickness = options.outline ? 2 : 0;
+    b.cornerRadius = options.radius ?? 18; b.thickness = options.outline ? 2 : 0;
     b.color = options.outline || C.line; b.background = options.fill || C.mint;
     b._townBaseFill = b.background;
     b.isPointerBlocker = true; b.isEnabled = options.enabled !== false;
     b.disabledColor = '#e4e5dd'; b.alpha = b.isEnabled ? 1 : .65;
     b.pointerEnterAnimation = b.pointerOutAnimation = b.pointerDownAnimation = b.pointerUpAnimation = () => {};
-    if (options.icon) { const sz = options.iconOnly ? 44 : 38; icon(b, options.icon, options.iconOnly ? (w - sz) / 2 : 17, (h - sz) / 2, sz, options.ink); }
-    if (label) text(b, label, options.icon ? 61 : 10, 0, w - (options.icon ? 72 : 20), h, options.size || 26, options.ink || C.ink, options.icon ? 'left' : 'center', true);
+    const iconSize = options.iconOnly ? 38 : w < 180 ? 28 : 36;
+    if (options.icon) icon(b, options.icon, options.iconOnly ? (w - iconSize) / 2 : 10, (h - iconSize) / 2, iconSize, options.ink);
+    if (label) {
+      const inset = options.icon ? iconSize + 16 : 8;
+      text(b, label, inset, 0, w - inset - 8, h, options.size || 24, options.ink || C.ink, options.icon ? 'left' : 'center', true);
+    }
     b.onPointerDownObservable.add((_, event) => {
-      if (event.userInfo?.event?.isPrimary === false) return;
+      if (orientationBlocked || event.userInfo?.event?.isPrimary === false) return;
       armed.add(b); b.background = options.pressedFill || '#c8dfcf';
     });
-    b.onPointerOutObservable.add(() => { armed.delete(b); b.background = options.fill || C.mint; });
-    b.onPointerUpObservable.add(() => { armed.delete(b); b.background = options.fill || C.mint; });
+    b.onPointerOutObservable.add(() => { armed.delete(b); b.background = b._townBaseFill; });
+    b.onPointerUpObservable.add(() => { armed.delete(b); b.background = b._townBaseFill; });
     b.onPointerClickObservable.add(() => {
-      if (!armed.has(b) || disposed || !b.isEnabled) return;
+      if (!armed.has(b) || disposed || orientationBlocked || !b.isEnabled) return;
       armed.delete(b);
       if (!reducedMotion && !lastState?.paused) { const m = b._currentMeasure; sparkles.add(m.left + m.width / 2, m.top + m.height / 2); }
       action();
     });
     parent.addControl(b); buttons.set(id, b); return b;
   }
-  function send(type, payload = {}) { onCommand({ type, ...payload }); }
+  function send(type, payload = {}) { if (!orientationBlocked) onCommand({ type, ...payload }); }
   function openPanel(nextPanel) {
-    priorPaused = !!lastState?.paused; panel = nextPanel;
-    if (!priorPaused) send('PAUSE', { value: true });
+    // Preserve the pause state from before the first panel, including when the
+    // task reminder switches to the destination picker.
+    const firstPanel = !panel;
+    if (firstPanel) priorPaused = !!lastState?.paused;
+    panel = nextPanel;
+    if (firstPanel && !priorPaused) send('PAUSE', { value: true });
     rebuild();
   }
   function closePanel() {
@@ -207,227 +231,263 @@ export function createUI(scene, callbacks = {}) {
     rebuild();
   }
   function setup() {
-    if (screen) screen.dispose();
-    buttons.clear(); armed.clear(); markers = new Map();
+    cancelPress();
+    screen?.dispose();
+    buttons.clear(); markers = new Map(); markersLayer = null;
     screen = new Container('ui-screen'); screen.width = '100%'; screen.height = '100%'; screen.zIndex = 1;
     screen.isHitTestVisible = false; texture.addControl(screen);
     frame = new Container('ui-frame'); frame.width = `${W}px`; frame.height = `${H}px`;
-    // Containers still traverse their children, but their empty area must not
-    // consume input before the lower map-marker layer gets to test its buttons.
     frame.isHitTestVisible = false; screen.addControl(frame);
   }
-  function shade() {
-    const s = new Rectangle('modal-shade'); s.width = '100%'; s.height = '100%'; s.background = '#254e43'; s.alpha = .35; s.thickness = 0; s.isPointerBlocker = true;
-    screen.addControl(s); screen.removeControl(frame); screen.addControl(frame);
+  function blockWorld() {
+    // The world stays fully visible. This transparent input surface prevents
+    // touches behind a task, help, settings, or pause panel from reaching it.
+    const blocker = new Rectangle('world-input-blocker');
+    blocker.width = '100%'; blocker.height = '100%'; blocker.background = 'transparent'; blocker.thickness = 0;
+    blocker.isPointerBlocker = true;
+    screen.addControl(blocker); screen.removeControl(frame); screen.addControl(frame);
   }
-  function modal(title, subtitle, { height = 652, width = 1000, close = false, utilities = true, badge = '今天也要快乐出发' } = {}) {
-    shade();
-    const x = (W - width) / 2, y = (H - height) / 2;
-    const card = box(frame, 'modal-card', x, y, width, height);
-    card.isHitTestVisible = true; card.isPointerBlocker = true; card.shadowColor = '#20392b26'; card.shadowBlur = 24; card.shadowOffsetY = 8;
-    box(card, 'tiny-tag', 34, 28, Math.min(width - 100, 288), 38, '#e8edda', 14);
-    text(card, badge, 48, 27, 280, 40, 20, C.teal, 'left', true);
-    text(card, title, 36, 80, width - 106, 58, 38, C.ink, 'left', true);
-    if (subtitle) text(card, subtitle, 38, 139, width - 76, 57, 25, C.muted);
-    if (close) button(card, 'close', '', width - 94, 22, 72, 72, closePanel, { icon: 'close', iconOnly: true });
+  function sidebar({ utilities = true, close = false } = {}) {
+    const bg = box(frame, 'operation-panel', WORLD_W, 0, PANEL_W, H, '#fffaf0', 0);
+    bg.isHitTestVisible = true; bg.isPointerBlocker = true;
+    box(bg, 'panel-edge', 0, 0, 3, H, '#d9e3d4', 0);
+    text(bg, '小车\n忙忙镇', 16, 10, 116, 76, 25, C.teal, 'left', true);
+    if (close) button(bg, 'close', '返回', 164, 12, 144, 72, closePanel, { icon: 'close' });
     else if (utilities) {
-      button(card, 'settings', '', width - 94, 22, 72, 72, () => openPanel('settings'), { icon: 'settings', iconOnly: true });
-      button(card, 'pause', '', width - 182, 22, 72, 72, () => send('PAUSE', { value: true }), { icon: 'pause', iconOnly: true });
+      button(bg, 'settings', '', 156, 12, 72, 72, () => openPanel('settings'), { icon: 'settings', iconOnly: true });
+      button(bg, 'pause', '', 236, 12, 72, 72, () => send('PAUSE', { value: true }), { icon: 'pause', iconOnly: true, fill: '#f4e2c7' });
     }
-    return card;
+    return box(bg, 'panel-content', 12, 100, CARD_W, 708, '#f6f3e8', 22);
   }
-  function header() {
-    const h = box(frame, 'header', 20, 16, W - 40, 88, '#fffaf0f2', 26);
-    h.isHitTestVisible = true; h.isPointerBlocker = true;
-    icon(h, 'car', 13, 9, 68, C.orange);
-    text(h, '小车忙忙镇', 90, 6, 260, 47, 30, C.ink, 'left', true);
-    const theme = THEMES.find(t => t.id === lastState?.map?.theme)?.name || '今天的小镇';
-    text(h, `${theme}  ·  第 ${(lastState?.round || 0) + 1} / 3 单`, 91, 48, 360, 30, 21, C.muted);
-    button(h, 'overview', '看全镇', 520, 8, 172, 72, () => onOverview(), { icon: 'town', fill: '#f0e9d8' });
-    button(h, 'sound', sound ? '声音开' : '声音关', 706, 8, 172, 72, () => { sound = !sound; onSound(sound); rebuild(); }, { icon: 'sound', fill: '#e6ede1' });
-    button(h, 'settings', '', 892, 8, 100, 72, () => openPanel('settings'), { icon: 'settings', iconOnly: true, fill: '#e6ede1' });
-    button(h, 'pause', '', 1006, 8, 100, 72, () => send('PAUSE', { value: true }), { icon: 'pause', iconOnly: true, fill: '#f4e2c7' });
+  function title(card, heading, subtitle = '', { subtitleHeight = 80 } = {}) {
+    text(card, heading, 12, 8, 272, 64, 28, C.ink, 'left', true);
+    if (subtitle) text(card, subtitle, 12, 76, 272, subtitleHeight, 22, C.muted);
   }
-  function missionRows(parent, y = 208) {
+  function helpButton(card, y = 620, width = 272) {
+    button(card, 'hint', '帮帮我', 12, y, width, 72, () => openPanel('hint'), { icon: 'hint', size: 24 });
+  }
+  function missionRows(parent, y = 158) {
     const mission = lastState?.mission;
-    (mission?.steps || []).forEach((step, i) => {
-      const row = box(parent, `instruction-${i}`, 36, y + i * 100, 928, 88, i % 2 ? '#e8efdf' : '#f1eadb', 18);
-      text(row, mission.ordered ? `${i + 1}` : '·', 8, 15, 42, 56, 28, C.teal, 'center', true);
-      icon(row, step.goodId, 50, 8, 70);
-      text(row, `${goods[step.goodId]?.name || step.goodId} × ${step.quantity}`, 135, 13, 260, 62, 29, C.ink, 'left', true);
-      icon(row, 'arrow', 400, 24, 40, '#849b7b');
-      icon(row, step.placeId, 468, 8, 70);
-      text(row, places[step.placeId]?.name || step.placeId, 552, 13, 350, 62, 29, C.ink, 'left', true);
+    (mission?.steps || []).slice(0, 3).forEach((step, i) => {
+      const row = box(parent, `instruction-${i}`, 12, y + i * 112, 272, 104, i % 2 ? '#e7eddf' : '#eee6d4', 16);
+      text(row, mission.ordered ? `${i + 1}.` : '·', 8, 5, 30, 40, 23, C.teal, 'center', true);
+      icon(row, step.goodId, 38, 6, 38);
+      text(row, `${goods[step.goodId]?.name || step.goodId} × ${step.quantity}`, 84, 4, 180, 44, 24, C.ink, 'left', true);
+      icon(row, 'arrow', 22, 59, 28, C.teal);
+      icon(row, step.placeId, 58, 54, 40);
+      text(row, places[step.placeId]?.name || step.placeId, 106, 53, 158, 44, 24, C.ink, 'left', true);
     });
   }
   function brief(isHint = false) {
-    const mission = lastState.mission;
-    const card = modal(isHint ? '再看看小任务' : mission?.title || '今天的小任务', mission?.ordered ? '先看清顺序。记不住也没关系，随时可以再看。' : '看看要带什么、送到哪里。准备好了再出发！', { close: isHint, badge: '小脑袋准备好了吗？' });
+    const mission = lastState.mission, card = sidebar({ close: isHint });
+    title(card, isHint ? '再看看小任务' : mission?.title || '今天的小任务', mission?.ordered ? '照着顺序记一记。想不起来，随时找我帮忙。' : '记住物品和地点，准备好后就出发！');
     missionRows(card);
-    button(card, 'listen', '再听一次', 36, 538, 278, 82, () => onSpeak(), { icon: 'listen' });
-    button(card, isHint ? 'close-hint' : 'ack', isHint ? '我想起来了' : '记住了，选小车', 510, 538, 454, 82, () => isHint ? closePanel() : send('ACK_BRIEF'), { icon: 'check', fill: C.teal, ink: C.white });
+    const canChooseDestination = isHint && ['explore', 'moving', 'delivery'].includes(lastState.phase);
+    button(card, 'listen', '再听一次', 12, 510, 272, 72, () => onSpeak(), { icon: 'listen' });
+    if (canChooseDestination) {
+      button(card, 'destinations', '选个地点', 12, 590, 132, 100, () => openPanel('destinations'), { size: 24 });
+      button(card, 'close-hint', '想起来了', 152, 590, 132, 100, closePanel, { fill: C.teal, ink: C.white });
+    } else {
+      button(card, isHint ? 'close-hint' : 'ack', isHint ? '我想起来了' : '记住了，选小车', 12, 610, 272, 82, () => isHint ? closePanel() : send('ACK_BRIEF'), { icon: 'check', fill: C.teal, ink: C.white, size: 25 });
+    }
   }
   function vehiclePicker() {
     const options = (lastState.mission?.vehicleChoices || VEHICLES.map(v => v.id)).map(id => cars[id]).filter(Boolean);
-    const card = modal('选一辆今天的伙伴', lastState.message || '小车各有本领。选好了，再去仓库装东西。', { badge: '第一站 · 小车车库' });
-    const columns = options.length <= 2 ? 2 : 3, gap = 18, cw = (928 - (columns - 1) * gap) / columns;
-    options.forEach((car, i) => {
-      const x = 36 + (i % columns) * (cw + gap), y = 214 + Math.floor(i / columns) * 168;
-      const b = button(card, `vehicle-${car.id}`, '', x, y, cw, 148, () => send('SELECT_VEHICLE', { vehicleId: car.id }), { fill: '#f0eddf' });
-      icon(b, car.id, 18, 18, 91);
-      text(b, car.name, 122, 18, cw - 132, 48, 28, C.ink, 'left', true);
+    const pages = Math.max(1, Math.ceil(options.length / 3));
+    vehiclePage = Math.min(vehiclePage, pages - 1);
+    const card = sidebar();
+    title(card, '选一辆小车', lastState.message || '小车各有本领，选好后去装东西。', { subtitleHeight: 68 });
+    options.slice(vehiclePage * 3, vehiclePage * 3 + 3).forEach((car, i) => {
+      const b = button(card, `vehicle-${car.id}`, '', 12, 152 + i * 116, 272, 108, () => send('SELECT_VEHICLE', { vehicleId: car.id }), { fill: '#ece8d8' });
+      icon(b, car.id, 10, 16, 76);
+      text(b, car.name, 100, 10, 164, 40, 27, C.ink, 'left', true);
       const special = { fridge: '冷藏物品', tanker: '运送清水', repair: '携带工具', bus: '搭载朋友' }[car.id] || '日常货物';
-      text(b, `${special}\n能装 ${car.capacity} 份`, 122, 67, cw - 132, 72, 23, C.muted);
+      text(b, special, 100, 40, 164, 34, 22, C.muted);
+      text(b, `能装 ${car.capacity} 份`, 100, 74, 164, 34, 22, C.muted);
     });
-    button(card, 'hint', '再看任务', 36, 548, 280, 72, () => openPanel('hint'), { icon: 'hint' });
-    button(card, 'listen', '再听一次', 684, 548, 280, 72, () => onSpeak(), { icon: 'listen' });
+    if (pages > 1) button(card, 'next-vehicles', `更多小车 · ${vehiclePage + 1}/${pages}`, 12, 520, 272, 72, () => { vehiclePage = (vehiclePage + 1) % pages; rebuild(); }, { icon: 'arrow', size: 23 });
+    helpButton(card);
   }
   function shelf() {
     const state = lastState, car = cars[state.vehicleId], count = state.cargo.reduce((a, b) => a + b.quantity, 0);
     const capacity = state.capacity ?? state.vehicleCapacity ?? Math.max(1, (car?.capacity || 0) + (state.capacityBonus || 0));
     const storedCount = (state.storedCargo || []).reduce((sum, item) => sum + item.quantity, 0);
-    const subtitle = `${state.message || '点一次装一份；选错了，点下面的物品就能取下来。'}${storedCount ? ` 仓库暂存 ${storedCount} 份，点货架取回。` : ''}`;
-    const card = modal('把记住的东西装上车', subtitle, { badge: `${places[state.location]?.name || '小镇仓库'} · 慢慢选，不着急` });
+    const card = sidebar();
+    text(card, '装上要带的东西', 12, 2, 272, 42, 28, C.ink, 'left', true);
+    text(card, state.message || '点物品装一份，点减号取下。', 12, 44, 272, 102, 22, C.muted);
+    text(card, `车上 ${count}/${capacity} 份${storedCount ? `，暂存${storedCount}份` : ''}`, 12, 146, 272, 34, 23, C.teal, 'left', true);
     const choices = (state.shelf || state.mission?.shelf || []).slice(0, 6);
-    const columns = Math.min(3, choices.length), gap = 14, cw = (928 - gap * (columns - 1)) / columns;
     choices.forEach((id, i) => {
-      const b = button(card, `load-${id}`, '', 36 + (i % columns) * (cw + gap), 208 + Math.floor(i / columns) * 104, cw, 92, () => send('LOAD', { goodId: id }), { fill: '#f0ecde' });
-      icon(b, id, 12, 12, 66); text(b, goods[id]?.name || id, 89, 13, cw - 96, 66, 28, C.ink, 'left', true);
+      const x = 12 + (i % 2) * 140, y = 180 + Math.floor(i / 2) * 144;
+      const tile = box(card, `shelf-${id}`, x, y, 132, 144, '#eee9d9', 16);
+      const load = button(tile, `load-${id}`, '', 0, 0, 132, 72, () => send('LOAD', { goodId: id }), { fill: '#eee9d9' });
+      icon(load, id, 5, 16, 40); text(load, goods[id]?.name || id, 48, 0, 78, 72, 23, C.ink, 'center', true);
+      const quantity = state.cargo.find(item => item.goodId === id)?.quantity || 0;
+      if (quantity) button(tile, `unload-${id}`, `−  ${quantity} 份`, 0, 72, 132, 72, () => send('UNLOAD', { goodId: id }), { fill: '#dce9d9', size: 24 });
+      else text(tile, '轻点装一份', 4, 82, 124, 48, 22, C.muted, 'center');
     });
-    text(card, `车上装了 ${count} / ${capacity} 份  ·  点物品取下`, 40, 418, 720, 36, 24, C.teal, 'left', true);
-    state.cargo.forEach((item, i) => {
-      const b = button(card, `unload-${item.goodId}`, '', 36 + i * 154, 460, 143, 72, () => send('UNLOAD', { goodId: item.goodId }), { fill: '#dfebdd' });
-      icon(b, item.goodId, 8, 11, 50); text(b, `×${item.quantity} −`, 65, 10, 73, 52, 25, C.ink, 'left', true);
-    });
-    if (!state.cargo.length) text(card, '空空的车厢，等你来装满', 39, 470, 600, 51, 25, C.muted);
-    button(card, 'hint', '再看任务', 36, 551, 240, 72, () => openPanel('hint'), { icon: 'hint' });
-    button(card, 'listen', '再听一次', 294, 551, 240, 72, () => onSpeak(), { icon: 'listen' });
-    button(card, 'depart', '装好了，出发！', 574, 551, 390, 72, () => send('DEPART'), { fill: C.teal, ink: C.white, icon: 'car' });
+    helpButton(card, 620, 132);
+    button(card, 'depart', '装好出发', 152, 620, 132, 72, () => send('DEPART'), { fill: C.teal, ink: C.white, size: 24 });
   }
   function makeMarkers() {
-    markersLayer = new Container('map-places'); markersLayer.width = '100%'; markersLayer.height = '100%'; markersLayer.isHitTestVisible = false; screen.addControl(markersLayer);
-    const enable = ['explore', 'delivery'].includes(lastState?.phase) && !lastState.paused && !panel;
-    markersLayer.isVisible = enable;
+    markersLayer = position(new Container('map-places'), 0, 0, WORLD_W, H);
+    markersLayer.isHitTestVisible = false; markersLayer.clipChildren = true;
+    frame.addControl(markersLayer);
+    markersLayer.isVisible = ['explore', 'delivery'].includes(lastState?.phase) && !lastState.paused && !panel && !orientationBlocked;
     for (const place of PLACES) {
-      const b = button(markersLayer, `place-${place.id}`, '', 0, 0, 156, 84, () => send('TRAVEL', { placeId: place.id }), { fill: 'transparent', pressedFill: '#dce9d888', radius: 22 });
-      // Keep a large touch target while the visible sign stays above the roof.
-      const chip=box(b, `sign-${place.id}`, 0, 17, 156, 52, '#fffaf0ed', 18);
-      icon(chip, place.id, 8, 7, 38); text(chip, place.name.replace('小镇', '').replace('阳光', '').replace('彩虹', '').replace('爱心', '').replace('开心', '').replace('熊熊', '').replace('汽车', ''), 50, 0, 98, 52, 24, C.ink, 'center', true);
+      const b = button(markersLayer, `place-${place.id}`, '', 0, 0, 132, 72, () => send('TRAVEL', { placeId: place.id }), { fill: 'transparent', pressedFill: '#dce9d855', radius: 16 });
+      const chip = box(b, `sign-${place.id}`, 16, 16, 100, 40, '#fffaf0ed', 13);
+      icon(chip, place.id, 3, 6, 28);
+      const shortName = place.name.replace(/小镇|阳光|彩虹|爱心|开心|熊熊|汽车/g, '');
+      text(chip, shortName, 32, 0, 66, 40, 21, C.ink, 'center', true);
       b.isVisible = false; markers.set(place.id, b);
     }
-    // The fixed HUD belongs above map markers, but markers do not block open sky.
-    screen.removeControl(frame); screen.addControl(frame); applyPlaces();
+    applyPlaces();
+  }
+  function getLayout() {
+    const size = texture.getSize(), rect = canvas?.getBoundingClientRect();
+    const ratio = texture.idealRatio || 1;
+    if (!rect?.width || !rect.height || !size.width || !size.height) return { worldRect: { x: 0, y: 0, width: 0, height: 0 }, panelRect: { x: 0, y: 0, width: 0, height: 0 } };
+    const sx = ratio * rect.width / size.width, sy = ratio * rect.height / size.height;
+    const x = (rect.width - W * sx) / 2, y = (rect.height - H * sy) / 2;
+    // Coordinates are CSS pixels relative to the canvas, matching projectPlaces.
+    return {
+      worldRect: { x, y, width: WORLD_W * sx, height: H * sy },
+      panelRect: { x: x + WORLD_W * sx, y, width: PANEL_W * sx, height: H * sy },
+      scale: { x: sx, y: sy }, logical: { width: W, height: H, worldWidth: WORLD_W },
+    };
   }
   function applyPlaces() {
-    const size = texture.getSize(), rect = canvas?.getBoundingClientRect();
-    if (!rect?.width || !rect.height || !markersLayer?.isVisible) return;
-    const ratio = texture.idealRatio || 1;
-    const placed=[];
-    for (const p of [...projected].sort((a,b)=>a.y-b.y)) {
+    const layout = getLayout();
+    if (!layout.scale || !markersLayer?.isVisible) return;
+    const { worldRect, scale } = layout, placed = [];
+    for (const p of [...projected].sort((a, b) => a.y - b.y)) {
       const b = markers.get(p.id); if (!b) continue;
-      const x = p.x * size.width / rect.width / ratio, y = p.y * size.height / rect.height / ratio;
-      const visible = p.visible !== false && y > 105 && y < H - 130;
-      let markerTop=Math.max(101,Math.min(H-242,y-96));
-      if(visible){
-        // Avoid stacked sign faces near the top HUD; keep their large targets.
-        for(const other of placed)if(Math.abs(other.x-x)<164&&Math.abs(other.top-markerTop)<72)markerTop=other.top+76;
-        placed.push({x,top:markerTop});
+      const x = (p.x - worldRect.x) / scale.x, y = (p.y - worldRect.y) / scale.y;
+      // Every touch rectangle remains strictly inside the left world region.
+      let left = Math.max(4, Math.min(WORLD_W - 136, x - 66));
+      let top = Math.max(4, Math.min(H - 76, y - 88));
+      const visible = p.visible !== false && x >= 0 && x <= WORLD_W && y >= 0 && y <= H;
+      if (visible) {
+        // Try small horizontal shifts first so signs stay above their buildings.
+        for (const shift of [0, -90, 90, -150, 150]) {
+          const candidate = Math.max(4, Math.min(WORLD_W - 136, x - 66 + shift));
+          if (!placed.some(other => Math.abs(other.left - candidate) < 108 && Math.abs(other.top - top) < 44)) { left = candidate; break; }
+        }
+        placed.push({ left, top });
       }
-      const left = `${Math.round(x - 78)}px`, top = `${Math.round(markerTop)}px`;
-      if (b.left !== left) b.left = left;
-      if (b.top !== top) b.top = top;
-      if (b.isVisible !== visible) b.isVisible = visible;
+      b.left = `${Math.round(left)}px`; b.top = `${Math.round(top)}px`; b.isVisible = visible;
     }
   }
   function drivingHUD() {
-    const s = lastState;
-    const h = box(frame, 'drive-bar', 20, 662, 1140, 138, '#fffaf0f5', 28);
-    h.isHitTestVisible = true; h.isPointerBlocker = true;
-    icon(h, s.phase === 'moving' ? s.vehicleId : 'hint', 15, 18, 76);
-    const defaults = { explore: '要送到哪里？点小镇里的地点吧。', moving: '小车在路上，我们慢慢来。', delivery: '到站啦！想想要交给朋友什么。' };
-    text(h, s.message || defaults[s.phase] || '点一点，小车自己开。', 104, 14, 576, 68, 26, C.ink, 'left', true);
-    const cargoText = s.cargo.map(i => `${goods[i.goodId]?.name}×${i.quantity}`).join('  ·  ');
-    text(h, cargoText ? `车上：${cargoText}` : '车上空空的，可以回仓库装东西', 107, 84, 560, 38, 22, C.muted);
-    button(h, 'hint', '再看', 702, 31, 130, 76, () => openPanel('hint'), { icon: 'hint', size: 25 });
-    button(h, 'listen', '再听', 846, 31, 130, 76, () => onSpeak(), { icon: 'listen', size: 25 });
-    button(h, 'destinations', '去哪', 990, 31, 128, 76, () => openPanel('destinations'), { fill: C.teal, ink: '#fff' });
+    const s = lastState, card = sidebar();
+    const defaults = { explore: '想一想要去哪里，再点小镇里的地点。', moving: '小车在路上，我们慢慢来。', delivery: '到站啦！选物品交给朋友。' };
+    const theme = THEMES.find(t => t.id === s.map?.theme)?.name || '今天的小镇';
+    text(card, `${theme} · 第 ${s.round + 1} / 3 单`, 12, 8, 272, 40, 22, C.teal, 'left', true);
+    text(card, s.message || defaults[s.phase] || '', 12, 52, 272, 138, 22, C.ink, 'left', true);
     if (s.phase === 'delivery') {
-      const dock = box(frame, 'delivery-dock', 260, 118, 660, 142, '#fffaf0f2', 24);
-      dock.isHitTestVisible = true; dock.isPointerBlocker = true;
-      text(dock, `这里是${places[s.location]?.name || '目的地'} · 点物品交一份`, 20, 9, 620, 38, 25, C.ink, 'left', true);
-      const n = s.cargo.length;
-      if (!n) text(dock, '没有物品了，去仓库补一补吧。', 20, 58, 620, 60, 25, C.muted);
-      s.cargo.forEach((item, i) => {
-        const width = Math.min(200, (620 - (n - 1) * 10) / n);
-        const b = button(dock, `deliver-${item.goodId}`, '', 20 + i * (width + 10), 54, width, 76, () => send('DELIVER', { goodId: item.goodId }), { fill: '#e1eddf' });
-        icon(b, item.goodId, 6, 10, 54);
-        text(b, width > 140 ? `${goods[item.goodId]?.name} ×${item.quantity}` : `×${item.quantity}`, 64, 8, width - 70, 60, 24, C.ink, 'left', true);
+      text(card, `这里是${places[s.location]?.name || '目的地'}`, 12, 192, 272, 36, 24, C.teal, 'left', true);
+      text(card, '点一次，交一份', 12, 228, 272, 34, 22, C.muted);
+      s.cargo.slice(0, 6).forEach((item, i) => {
+        const b = button(card, `deliver-${item.goodId}`, '', 12 + (i % 2) * 140, 266 + Math.floor(i / 2) * 88, 132, 84, () => send('DELIVER', { goodId: item.goodId }));
+        icon(b, item.goodId, 4, 6, 38);
+        text(b, goods[item.goodId]?.name || item.goodId, 46, 4, 80, 42, 22, C.ink, 'center', true);
+        text(b, `× ${item.quantity}`, 10, 46, 112, 34, 23, C.ink, 'center', true);
       });
+      if (!s.cargo.length) text(card, '车上空空的，回仓库再装一些吧。', 12, 278, 272, 100, 24, C.muted);
+    } else {
+      icon(card, s.vehicleId || 'car', 82, 198, 132);
+      text(card, '车上带着', 12, 342, 272, 40, 23, C.teal, 'left', true);
+      s.cargo.slice(0, 6).forEach((item, i) => text(card, `${goods[item.goodId]?.name} ×${item.quantity}`, 12 + (i % 2) * 140, 386 + Math.floor(i / 2) * 44, 132, 40, 22, C.muted));
+      if (!s.cargo.length) text(card, '空空的车厢，可以去仓库装东西。', 12, 388, 272, 100, 24, C.muted);
     }
+    button(card, 'overview', '看全镇', 12, 540, 272, 72, () => onOverview(), { icon: 'town', size: 24 });
+    helpButton(card);
   }
   function destinations() {
-    const card = modal('想去哪里逛一逛？', '每个地方都可以去。选好了，小车自己开。', { close: true, badge: '小镇地图 · 没有走错的路' });
+    const card = sidebar({ close: true });
+    title(card, '想去哪里？', '选一个地点，小车就会自己开过去。', { subtitleHeight: 68 });
     PLACES.forEach((place, i) => {
-      const b = button(card, `destination-${place.id}`, '', 36 + (i % 3) * 314, 213 + Math.floor(i / 3) * 119, 300, 104, () => { panel = null; if (!priorPaused) send('PAUSE', { value: false }); send('TRAVEL', { placeId: place.id }); rebuild(); }, { fill: '#e7eddd' });
-      icon(b, place.id, 12, 18, 66); text(b, place.name, 90, 13, 200, 77, 28, C.ink, 'left', true);
+      const b = button(card, `destination-${place.id}`, '', 12 + (i % 2) * 140, 158 + Math.floor(i / 2) * 110, 132, 100, () => {
+        panel = null;
+        if (!priorPaused) send('PAUSE', { value: false });
+        send('TRAVEL', { placeId: place.id }); rebuild();
+      });
+      icon(b, place.id, 48, 4, 36);
+      text(b, place.name, 4, 42, 124, 54, 23, C.ink, 'center', true);
     });
+    button(card, 'close-hint', '回到小镇', 12, 620, 272, 72, closePanel, { fill: C.teal, ink: C.white });
   }
   function eventCard() {
-    const e = lastState.event;
-    const card = modal(e?.title || '遇到一点小变化', e?.message || '没关系，一起想个办法。', { badge: '勇敢试一试 · 总会有办法' });
-    icon(card, e?.id === 'repair' ? 'repair-tool' : e?.id === 'shortage' ? 'parcel' : 'car', 414, 209, 172, C.orange);
-    (e?.options || []).forEach((opt, i) => button(card, `event-${opt.id}`, opt.label, 36 + i * 474, 438, 454, 96, () => send('RESOLVE_EVENT', { optionId: opt.id }), { fill: i ? '#e4ebdd' : C.teal, ink: i ? C.ink : C.white, size: 27 }));
-    text(card, '不用着急，原来的小任务还在等你。', 80, 563, 840, 52, 26, C.muted, 'center');
+    const e = lastState.event, card = sidebar();
+    title(card, e?.title || '遇到一点小变化');
+    text(card, e?.message || '没关系，一起想个办法。', 12, 82, 272, 180, 23, C.muted);
+    icon(card, e?.id === 'repair' ? 'repair-tool' : e?.id === 'shortage' ? 'parcel' : 'car', 92, 274, 112, C.orange);
+    (e?.options || []).forEach((opt, i) => button(card, `event-${opt.id}`, opt.label, 12, 414 + i * 100, 272, 88, () => send('RESOLVE_EVENT', { optionId: opt.id }), { fill: i ? C.mint : C.teal, ink: i ? C.ink : C.white, size: 24 }));
+    text(card, '慢慢想，总会有办法。', 12, 632, 272, 50, 22, C.muted, 'center');
   }
   function reward(isSession = false) {
-    const card = modal(isSession ? '今天的三次帮忙，都完成啦！' : '谢谢你，小小帮手！', isSession ? '你记住了任务，也照顾了小镇的朋友。' : '每一次认真想一想，都很了不起。', { badge: '收集一个快乐的回忆' });
-    icon(card, 'star', 398, 203, 204, C.yellow);
-    const n = lastState.rewardCount || 0;
-    text(card, `已经帮助朋友 ${n} 次`, 180, 421, 640, 57, 32, C.teal, 'center', true);
-    if (historicalCount) text(card, `旧版贴纸回忆：${historicalCount} 张`, 180, 479, 640, 40, 24, C.muted, 'center');
-    button(card, isSession ? 'new-session' : 'next', isSession ? '再去一个新小镇' : lastState.round >= 2 ? '看看今天的收获' : '再接一个小任务', 260, 532, 480, 86, () => isSession ? onNewSession(lastState.difficulty) : send('NEXT'), { fill: C.teal, ink: C.white, icon: 'arrow', size: 28 });
+    const card = sidebar();
+    title(card, isSession ? '三次帮忙都完成啦！' : '谢谢你，小小帮手！', isSession ? '你记住了任务，也照顾了小镇的朋友。' : '认真想一想，就很了不起。');
+    icon(card, 'star', 62, 196, 172, C.yellow);
+    text(card, `已经帮助朋友 ${lastState.rewardCount || 0} 次`, 12, 394, 272, 72, 27, C.teal, 'center', true);
+    if (historicalCount) text(card, `旧版贴纸：${historicalCount} 张`, 12, 480, 272, 40, 22, C.muted, 'center');
+    button(card, isSession ? 'new-session' : 'next', isSession ? '再去一个新小镇' : lastState.round >= 2 ? '看看今天的收获' : '再接一个小任务', 12, 600, 272, 92, () => isSession ? onNewSession(lastState.difficulty) : send('NEXT'), { fill: C.teal, ink: C.white, size: 25 });
   }
   function paused() {
-    const card = modal('小车休息一下', '喝口水、伸个懒腰。小镇会在这里等你。', { height: 520, width: 900, utilities: false, badge: '慢慢来，休息也很棒' });
-    icon(card, lastState.vehicleId || 'car', 365, 206, 150);
-    button(card, 'resume', '继续出发', 240, 398, 420, 86, () => send('PAUSE', { value: false }), { fill: C.teal, ink: C.white, icon: 'arrow' });
+    const card = sidebar({ utilities: false });
+    title(card, '小车休息一下', '喝口水，伸个懒腰。小镇在这里等你。');
+    icon(card, lastState.vehicleId || 'car', 62, 230, 172);
+    button(card, 'resume', '继续出发', 12, 600, 272, 92, () => send('PAUSE', { value: false }), { fill: C.teal, ink: C.white, icon: 'arrow' });
   }
   function settings() {
-    const card = modal('大人和小司机的小设置', '难度只由你来选。换新地图后，会开始新的三单。', { close: true, badge: '陪伴着玩 · 一次练习一点点' });
+    const card = sidebar({ close: true });
+    text(card, '小司机的小设置', 12, 8, 272, 54, 28, C.ink, 'left', true);
     DIFFICULTIES.forEach((d, i) => {
       const selected = chosenDifficulty === d.id;
-      const b = button(card, `difficulty-${d.id}`, '', 36 + i * 314, 207, 300, 150, () => { chosenDifficulty = d.id; rebuild(); }, { fill: selected ? '#cde3cd' : '#ececde', outline: selected ? C.teal : null });
-      text(b, d.name, 18, 14, 264, 45, 28, C.ink, 'left', true);
-      text(b, d.description, 18, 65, 264, 70, 23, C.muted);
+      const b = button(card, `difficulty-${d.id}`, '', 12, 64 + i * 96, 272, 88, () => { chosenDifficulty = d.id; rebuild(); }, { fill: selected ? '#cde3cd' : '#e9e9db', outline: selected ? C.teal : null });
+      text(b, d.name, 10, 3, 252, 38, 25, C.ink, 'left', true);
+      const description = { easy: '记一种物品和一个地点', normal: '记两种物品和两个地点', challenge: '记三步，按顺序完成' }[d.id];
+      text(b, description, 10, 44, 252, 38, 22, C.muted);
     });
-    button(card, 'setting-sound', sound ? '声音：开' : '声音：关', 36, 387, 440, 76, () => { sound = !sound; onSound(sound); rebuild(); }, { icon: 'sound' });
-    button(card, 'reduced-motion', reducedMotion ? '轻柔动态：开' : '轻柔动态：关', 496, 387, 468, 76, () => { reducedMotion = !reducedMotion; if (reducedMotion) { sparkles.bursts = []; sparkles._markAsDirty(); } onReducedMotion(reducedMotion); rebuild(); });
-    text(card, '轻柔动态会减少天气和庆祝的小粒子。', 40, 480, 920, 45, 24, C.muted);
-    button(card, 'new-session', '用这个难度去新小镇', 510, 545, 454, 76, () => { panel = null; onNewSession(chosenDifficulty); rebuild(); }, { fill: C.teal, ink: C.white, size: 27 });
-    button(card, 'back-to-town', '回到小镇', 36, 545, 278, 76, closePanel);
+    const soundButton = button(card, 'setting-sound', sound ? '声音：开' : '声音：关', 12, 356, 272, 72, () => { sound = !sound; onSound(sound); rebuild(); }, { icon: 'sound' });
+    buttons.set('sound', soundButton); // Existing test ID now points to the settings action.
+    button(card, 'reduced-motion', reducedMotion ? '轻柔动态：开' : '轻柔动态：关', 12, 436, 272, 72, () => { reducedMotion = !reducedMotion; if (reducedMotion) { sparkles.bursts = []; sparkles._markAsDirty(); } onReducedMotion(reducedMotion); rebuild(); }, { size: 24 });
+    button(card, 'new-session', '用这个难度去新小镇', 12, 516, 272, 72, () => { panel = null; onNewSession(chosenDifficulty); rebuild(); }, { fill: C.teal, ink: C.white, size: 23 });
+    button(card, 'back-to-town', '回到小镇', 12, 620, 272, 72, closePanel, { size: 24 });
   }
   function landing() {
-    box(frame, 'landing-bg', 0, 0, W, H, '#e7efdf', 0);
-    icon(frame, 'farm', 60, 105, 195, '#a6c896'); icon(frame, 'town', 945, 400, 200, '#e0c091');
-    box(frame, 'landing-card', 194, 89, 792, 640, C.cream, 42);
-    icon(frame, 'car', 490, 113, 200, C.orange);
-    text(frame, '小车忙忙镇', 250, 315, 680, 77, 58, C.ink, 'center', true);
-    text(frame, '记一记 · 帮帮忙 · 去小镇冒险', 245, 400, 690, 49, 28, C.muted, 'center');
+    const card = sidebar({ utilities: false });
+    title(card, '小车忙忙镇', '记一记，帮帮忙，去小镇冒险。');
+    icon(card, 'car', 62, 192, 172, C.orange);
     if (mode === 'ready') {
-      text(frame, '小镇全部准备好了，点一下出发吧！', 245, 468, 690, 49, 25, C.teal, 'center');
-      button(frame, 'start', '快乐出发', 366, 553, 448, 98, () => { mode = 'game'; send('START'); rebuild(); }, { fill: C.teal, ink: C.white, icon: 'arrow', size: 32 });
+      text(card, '小镇准备好了，快乐出发吧！', 12, 400, 272, 90, 26, C.teal, 'center', true);
+      button(card, 'start', '快乐出发', 12, 596, 272, 96, () => { mode = 'game'; send('START'); rebuild(); }, { fill: C.teal, ink: C.white, icon: 'arrow', size: 28 });
     } else {
       const progress = Math.max(0, Math.min(1, Number(loadingState.progress) || 0));
-      text(frame, loadingState.error ? '还差一点点，再试一次就好。' : loadingState.text, 242, 466, 696, 75, 25, C.muted, 'center');
-      box(frame, 'progress-track', 280, 574, 620, 22, '#e6e8d8', 11);
-      if (progress > 0) box(frame, 'progress-fill', 280, 574, Math.max(22, 620 * progress), 22, C.teal, 11);
-      if (loadingState.error) button(frame, 'retry', '再试一次', 390, 620, 400, 78, () => send('RETRY_LOAD'), { fill: C.teal, ink: C.white });
-      else text(frame, `${Math.round(progress * 100)}%  ·  准备好后，玩的时候不用再等下载`, 250, 618, 680, 54, 22, C.muted, 'center');
+      text(card, loadingState.error ? '还差一点点，再试一次就好。' : loadingState.text, 12, 388, 272, 114, 24, C.muted, 'center');
+      box(card, 'progress-track', 20, 530, 256, 20, '#e0e5d5', 10);
+      if (progress > 0) box(card, 'progress-fill', 20, 530, Math.max(20, 256 * progress), 20, C.teal, 10);
+      if (loadingState.error) button(card, 'retry', '再试一次', 12, 610, 272, 82, () => send('RETRY_LOAD'), { fill: C.teal, ink: C.white });
+      else text(card, `${Math.round(progress * 100)}%\n准备好后，玩时不用再下载`, 12, 578, 272, 104, 22, C.muted, 'center');
     }
+  }
+  function orientationNotice() {
+    const bg = new Rectangle('orientation-blocker'); bg.width = '100%'; bg.height = '100%'; bg.background = C.cream; bg.thickness = 0; bg.isPointerBlocker = true;
+    screen.addControl(bg);
+    const heading = new TextBlock('orientation-instruction', '把 iPad 横过来玩');
+    heading.width = '94%'; heading.height = '110px'; heading.fontSize = 36; heading.color = C.ink; heading.fontWeight = '700'; heading.textWrapping = true; heading.isHitTestVisible = false;
+    bg.addControl(heading);
+    const detail = new TextBlock('orientation-detail', '小镇和操作面板，就能一起看清啦');
+    detail.width = '88%'; detail.height = '100px'; detail.top = '110px'; detail.fontSize = 25; detail.color = C.muted; detail.textWrapping = true; detail.isHitTestVisible = false;
+    bg.addControl(detail);
   }
   function rebuild() {
     if (disposed) return;
     setup();
+    if (orientationBlocked) { orientationNotice(); return; }
+    const interactiveWorld = mode === 'game' && lastState && ['explore', 'delivery'].includes(lastState.phase) && !lastState.paused && !panel;
+    if (!interactiveWorld) blockWorld();
     if (mode !== 'game' || !lastState) { landing(); return; }
     makeMarkers();
     if (panel === 'hint') { brief(true); return; }
@@ -440,11 +500,11 @@ export function createUI(scene, callbacks = {}) {
     else if (lastState.phase === 'event') eventCard();
     else if (lastState.phase === 'reward') reward();
     else if (lastState.phase === 'sessionComplete') reward(true);
-    else { header(); drivingHUD(); }
+    else drivingHUD();
   }
   function getBounds() {
     const result = {}, size = texture.getSize(), rect = canvas?.getBoundingClientRect();
-    if (!rect?.width || !size.width) return result;
+    if (!rect?.width || !size.width || orientationBlocked) return result;
     for (const [id, b] of buttons) {
       let visible = b.isEnabled && b.isVisible && !b.notRenderable;
       for (let p = b.parent; p; p = p.parent) visible &&= p.isVisible && p.isEnabled;
@@ -458,6 +518,7 @@ export function createUI(scene, callbacks = {}) {
   return {
     render(state) {
       const signature = JSON.stringify(state);
+      if (lastState?.mission?.id !== state.mission?.id || state.phase !== 'selectVehicle') vehiclePage = 0;
       if (lastState?.seed !== state.seed || (lastState?.phase !== state.phase && state.phase === 'brief')) panel = null;
       lastState = state;
       if (!panel) chosenDifficulty = state.difficulty;
@@ -467,11 +528,18 @@ export function createUI(scene, callbacks = {}) {
     ready() { mode = 'ready'; rebuild(); },
     setSettings(settings = {}) { sound = settings.sound ?? sound; historicalCount = settings.historicalCount ?? historicalCount; reducedMotion = settings.reducedMotion ?? reducedMotion; if (reducedMotion) { sparkles.bursts = []; sparkles._markAsDirty(); } rebuild(); },
     setPlaces(points) { projected = points || []; applyPlaces(); },
+    setOrientationBlocked(blocked) {
+      const next = !!blocked;
+      if (next === orientationBlocked) return;
+      orientationBlocked = next; cancelPress(); sparkles.bursts = []; sparkles._markAsDirty(); rebuild();
+    },
     cancelInput: cancelPress,
     getBounds,
+    getLayout,
     dispose() {
       disposed = true; cancelPress(); scene.onBeforeRenderObservable.remove(tick); engine.onResizeObservable.remove(resizeObserver);
-      canvas?.removeEventListener('pointercancel', cancelPress, true); canvas?.removeEventListener('pointerdown', secondPointer, true); canvas?.removeEventListener('lostpointercapture', cancelPress, true);
+      canvas?.removeEventListener('pointermove', cancelOutside, true); canvas?.removeEventListener('pointerup', cancelOutside, true);
+      canvas?.removeEventListener('pointercancel', cancelPress, true); canvas?.ownerDocument?.removeEventListener('pointerdown', secondPointer, true); canvas?.removeEventListener('lostpointercapture', cancelPress, true);
       texture.dispose();
     },
   };

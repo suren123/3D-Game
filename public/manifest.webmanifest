@@ -1,0 +1,27 @@
+{
+  "id": "./",
+  "name": "小车忙忙镇",
+  "short_name": "小车忙忙镇",
+  "description": "开着小车完成送货委托的儿童记忆游戏",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#f8f7ed",
+  "theme_color": "#f8f7ed",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

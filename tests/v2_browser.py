@@ -7,6 +7,10 @@ ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'artifacts'/'v2'; URL=os.environ.get('TOWN_URL','http://127.0.0.1:5173/')
 VEHICLES=json.loads(subprocess.check_output(['node','--input-type=module','-e',"import{VEHICLES}from'./src/v2/catalog.js';console.log(JSON.stringify(VEHICLES))"],cwd=ROOT,text=True))
 checks=[]
+def is_game_request(request):
+ # Browsers may inspect installation metadata after play begins; these files
+ # are not requested by gameplay and never block a vehicle, voice or texture.
+ return not request.url.split('?')[0].endswith(('/manifest.webmanifest','/icons/apple-touch-icon.png','/icons/icon-192.png','/icons/icon-512.png','/icons/favicon-32.png'))
 async def snap(p):return await p.evaluate('window.__townTest.snapshot()')
 async def state(p):return (await snap(p))['state']
 def ok(name):checks.append(name);print('PASS',name,flush=True)
@@ -14,6 +18,16 @@ async def center(p,key):
  await p.wait_for_function('(k)=>!!window.__townTest?.snapshot().bounds?.[k]',arg=key,timeout=15000)
  b=(await snap(p))['bounds'][key];return b['x']+b['width']/2,b['y']+b['height']/2
 async def click(p,key):
+ if key in ('listen','destinations') and key not in (await snap(p))['bounds']:
+  # These secondary actions now live inside the child's single help panel.
+  await click(p,'hint')
+ if key.startswith('vehicle-'):
+  await p.wait_for_function('Object.keys(window.__townTest.snapshot().bounds).some(k=>k.startsWith("vehicle-"))')
+  for _ in range(3):
+   bounds=(await snap(p))['bounds']
+   if key in bounds or 'next-vehicles' not in bounds:break
+   await click(p,'next-vehicles')
+   await p.wait_for_function('!!window.__townTest.snapshot().bounds["next-vehicles"]')
  x,y=await center(p,key);await p.touchscreen.tap(x,y);await p.wait_for_timeout(120)
 async def phase(p,value):await p.wait_for_function('(v)=>window.__townTest.snapshot().state.phase===v',arg=value,timeout=60000)
 async def travel(p,place):
@@ -80,7 +94,7 @@ async def main():
   browser=await pw.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
   ctx=await browser.new_context(viewport={'width':1180,'height':820},device_scale_factor=1,has_touch=True)
   p=await ctx.new_page();requests=[]
-  p.on('pageerror',lambda e:errors.append(str(e)));p.on('request',lambda r:requests.append(r.url))
+  p.on('pageerror',lambda e:errors.append(str(e)));p.on('request',lambda r:requests.append(r.url) if is_game_request(r) else None)
   try:
    await p.goto(URL+'?test=1&seed=11',wait_until='domcontentloaded')
    await p.wait_for_function('window.__townTest?.snapshot().ready',timeout=120000)

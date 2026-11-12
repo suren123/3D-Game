@@ -47,3 +47,11 @@ GitHub Actions运行43212030141成功，https://suren123.github.io/3D-Game/ 已�
 3. 分离操作区与地图：建议左侧约75%为独立世界视口，右侧约25%为固定Canvas操作区；阶段性显示任务/车辆/装货/交货，合并重复帮助入口，地图不再覆盖大卡片。继续单一可见Canvas，可用Three正交UI层+离屏CanvasTexture。
 
 本轮只读研究：ipad_install_research、v1_visual_audit，均请求GPT-6.1 Sol high，无文件写入；主Agent负责发布。用户已授权后续做好直接发布，无需再次询问发布权限。上述三项尚待实施，当前先交付可试玩样板。
+
+## 当前执行：iPad与侧栏修复
+
+用户最新澄清覆盖此前“立即恢复V1”的实施推断：当前先核实样板，不换引擎、不重做画风，只补确实缺失的启动与界面分区。db5ded5视觉样板已完成Pages部署（Actions 43232359495），线上25模型、46语音、真实标签点击配送通过。
+
+本轮主Agent持有main/world/style/测试与整合；ipad_install_research完成index/manifest/icons（Sol high）；sidebar_ui负责全Canvas右侧UI与六车分页（Sol high）；v1_visual_audit只读审查主Agent方向/投影改动（Sol high）。用户已授权完成后直接发布main。
+
+本轮最终验证完成：21项规则测试、构建/资产/安装配置检查、15项完整浏览器集成、iPad布局/旋转保护、三组鼠标/触屏地图交互全部通过。UI额外修复拖出误触与HTML边缘第二触点取消。发布内容保持视觉样板，加入右侧操作区与主屏幕配置；真机主屏幕安装仍待用户确认。

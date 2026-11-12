@@ -12,6 +12,17 @@ async def run():
    p=await ctx.new_page();p.on('pageerror',lambda e:errors.append(str(e)))
    await p.goto(URL+'?test=1&seed=11');await p.wait_for_function('window.__townTest?.snapshot().ready',timeout=120000)
    await click(p,'start');await prepare(p);await fill(p);await click(p,'depart');await p.wait_for_timeout(350)
+   # A second finger may land on HTML/safe-area padding outside the canvas.
+   # It must cancel a pending building pick as well as a GUI button press.
+   await p.wait_for_function('!!window.__townTest.snapshot().bounds["place-school"]')
+   body=next(v['building'] for v in (await snap(p))['places'] if v['id']=='school')
+   cdp=await ctx.new_cdp_session(p)
+   a={'x':body['x'],'y':body['y'],'id':1};b={'x':width,'y':body['y'],'id':2}
+   await cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[a]})
+   await cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[a,b]})
+   await cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
+   await p.wait_for_timeout(200);assert (await state(p))['phase']=='explore'
+   await cdp.detach()
    # Drag out of a map label must not turn into a trip.
    x,y=await center(p,'place-cafe');await p.mouse.move(x,y);await p.mouse.down();await p.mouse.move(15,400,steps=8);await p.mouse.up()
    assert (await state(p))['phase']=='explore'

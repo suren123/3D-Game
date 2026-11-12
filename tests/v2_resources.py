@@ -2,7 +2,7 @@
 """Final resource/vehicle/preload-failure/storage checks through actual Canvas touches."""
 import asyncio,json,subprocess
 from playwright.async_api import async_playwright
-from v2_browser import ROOT,OUT,URL,snap,state,click,fill,finish,phase,VEHICLES
+from v2_browser import ROOT,OUT,URL,snap,state,click,fill,finish,phase,VEHICLES,is_game_request
 plans=json.loads(subprocess.check_output(['node','--input-type=module','-e',"import{createGame}from'./src/v2/rules.js';import{VEHICLES}from'./src/v2/catalog.js';console.log(JSON.stringify(VEHICLES.map(v=>{for(let seed=0;seed<1000;seed++){const s=createGame({seed}).getState();if(s.mission.vehicleChoices.includes(v.id)&&s.mission.requiredTags.every(t=>v.supports.includes(t)))return {id:v.id,seed};}throw Error(v.id)})))"],cwd=ROOT,text=True))
 async def run():
  OUT.mkdir(parents=True,exist_ok=True);results=[];errors=[]
@@ -13,7 +13,8 @@ async def run():
   p=await ctx.new_page();p.on('pageerror',lambda e:errors.append(str(e)))
   for plan in plans:
    requests=[]
-   def record(r):requests.append(r.url)
+   def record(r):
+    if is_game_request(r):requests.append(r.url)
    p.on('request',record)
    await ctx.set_offline(False)
    await p.goto(URL+f"?test=1&seed={plan['seed']}&difficulty=easy")

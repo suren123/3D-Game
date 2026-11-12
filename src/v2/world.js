@@ -59,6 +59,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   let paused = false, moving = false, route = [], routeIndex = 0, destination = null;
   let clock = 0, weatherTime = 0, rainTime = 0, travelDust = 0, overviewMode = true;
   let mapRadius = 20, targetHalfHeight = 23, currentHalfHeight = 23;
+  let worldRect = null;
   const aim = Vector3.Zero();
   const position = new Vector3(0, .14, 0);
   const mapInstances = [], places = new Map(), placement = new Map();
@@ -224,12 +225,24 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     fitCamera();
   }
   function fitCamera(dt=0) {
-    const aspect=engine.getRenderWidth()/Math.max(1,engine.getRenderHeight());
+    const bounds=canvas.getBoundingClientRect();
+    const area=worldRect||{x:0,y:0,width:bounds.width,height:bounds.height};
+    const aspect=area.width/Math.max(1,area.height);
     targetHalfHeight = overviewMode ? Math.max(23.5, mapRadius * 1.24, mapRadius * 1.5 / aspect) : 15.5;
     currentHalfHeight=dt?currentHalfHeight+(targetHalfHeight-currentHalfHeight)*(1-Math.exp(-dt*3)):targetHalfHeight;
-    // Leave room for the compact top and bottom Canvas HUD, without a tiny map.
-    camera.orthoTop=currentHalfHeight;camera.orthoBottom=-currentHalfHeight;
-    camera.orthoLeft=-currentHalfHeight*aspect;camera.orthoRight=currentHalfHeight*aspect;
+    // Off-centre projection fits the town into its own rectangle. Keeping the
+    // camera's full viewport lets the fullscreen Canvas GUI render normally.
+    const unitsPerPixel=2*currentHalfHeight/Math.max(1,area.height);
+    camera.orthoLeft=-(area.x+area.width/2)*unitsPerPixel;
+    camera.orthoRight=(bounds.width-area.x-area.width/2)*unitsPerPixel;
+    camera.orthoTop=(area.y+area.height/2)*unitsPerPixel;
+    camera.orthoBottom=-(bounds.height-area.y-area.height/2)*unitsPerPixel;
+  }
+  function setLayout(rect){
+    if(!rect||rect.width<=0||rect.height<=0)return;
+    if(worldRect&&['x','y','width','height'].every(k=>Math.abs(worldRect[k]-rect[k])<.1))return;
+    worldRect={x:rect.x,y:rect.y,width:rect.width,height:rect.height};
+    fitCamera();
   }
   function setVehicle(id) {
     if(id===vehicleId&&vehicle)return;
@@ -325,9 +338,11 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
       const p=placement.get(place.id);
       const projected=Vector3.Project(new Vector3(p.x,place.id==='park'?1.6:3.7,p.z),Matrix.Identity(),scene.getTransformMatrix(),viewport);
       const building=Vector3.Project(new Vector3(p.x,.8,p.z),Matrix.Identity(),scene.getTransformMatrix(),viewport);
-      return {id:place.id,x:projected.x/w*rect.width,y:projected.y/h*rect.height,
+      const x=projected.x/w*rect.width,y=projected.y/h*rect.height;
+      const area=worldRect||{x:0,y:0,width:rect.width,height:rect.height};
+      return {id:place.id,x,y,
         building:{x:building.x/w*rect.width,y:building.y/h*rect.height},
-        visible:projected.z>=0&&projected.z<=1&&projected.x>=0&&projected.x<=w&&projected.y>=0&&projected.y<=h};
+        visible:projected.z>=0&&projected.z<=1&&x>=area.x&&x<=area.x+area.width&&y>=area.y&&y<=area.y+area.height};
     });
   }
   let pressed=null;
@@ -337,6 +352,8 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   const trackUp = event => { heldPointers.delete(event.pointerId); if (!heldPointers.size) queueMicrotask(() => { multiPointerGesture = false; }); };
   const observer=scene.onPointerObservable.add(info=>{
     const event=info.event;
+    const bounds=canvas.getBoundingClientRect(),x=event.clientX-bounds.left,y=event.clientY-bounds.top;
+    if(worldRect&&(x<worldRect.x||x>worldRect.x+worldRect.width||y<worldRect.y||y>worldRect.y+worldRect.height)){pressed=null;return;}
     if(info.type===PointerEventTypes.POINTERDOWN){
       if(multiPointerGesture)return;
       if(pressed){pressed=null;return;}
@@ -355,7 +372,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   canvas?.addEventListener('pointercancel',cancel);canvas?.addEventListener('lostpointercapture',cancel);
   const resizeObserver=engine.onResizeObservable.add(()=>fitCamera());
   return {
-    setMap,sync,travel,update,overview,effect,projectPlaces,
+    setMap,sync,travel,update,overview,effect,projectPlaces,setLayout,
     cancelInput(){pressed=null;heldPointers.clear();multiPointerGesture=false;},
     setPaused(value){paused=!!value;pressed=null;},
     setReducedMotion(value){reducedMotion=!!value;if(value){for(const p of particles.particles)p.isVisible=false;particles.setParticles();}},

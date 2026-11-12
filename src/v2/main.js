@@ -32,6 +32,7 @@ const game=createGame({seed:testMode&&params.has('seed')?Number(params.get('seed
   difficulty:testMode&&params.has('difficulty')?params.get('difficulty'):(saved.difficulty||'easy'),saved});
 let engine,scene,ui,world,audio,resources,instrumentation,started=false,ready=false,loading=false,previous=game.getState();
 let renderSamples=[],lastFrame=performance.now(),frameCount=0,renderScale=Math.min(window.devicePixelRatio||1,1.25);
+let orientationBlocked=false,pausedByOrientation=false;
 function persist(){
   const s=game.getState();
   try{localStorage.setItem(SAVE_KEY,JSON.stringify({version:2,...settings,difficulty:s.difficulty,rewardCount:s.rewardCount,historicalStickers:saved.historicalStickers||[]}));}catch{}
@@ -39,7 +40,7 @@ function persist(){
 function speak(){if(started&&ready&&settings.sound)audio.speak(missionSpeech(game.getState()));}
 function newSession(difficulty){audio.stop();game.dispatch({type:'NEW_SESSION',seed:randomSeed(),difficulty});}
 function command(intent){
-  if(multiPointer)return;
+  if(multiPointer||orientationBlocked)return;
   if(intent.type==='RETRY_LOAD'){location.reload();return;}
   if(intent.type==='START'){
     if(!ready||started)return;started=true;
@@ -62,12 +63,32 @@ function fail(error){
 let primaryPointer=null,multiPointer=false;
 const heldPointers=new Set();
 function cancelInput(){ui?.cancelInput?.();world?.cancelInput?.();}
-canvas.addEventListener('pointerdown',event=>{
+function fitViewport(){
+  // visualViewport also covers older Safari versions without dynamic vh units.
+  document.body.style.height=`${Math.round(window.visualViewport?.height||window.innerHeight)}px`;
+  engine?.resize();
+  const rect=canvas.getBoundingClientRect(),blocked=rect.height>rect.width;
+  if(blocked!==orientationBlocked){
+    orientationBlocked=blocked;cancelInput();heldPointers.clear();primaryPointer=null;multiPointer=false;
+    if(blocked){
+      audio?.stop();
+      pausedByOrientation=started&&!game.getState().paused;
+      if(started)game.dispatch({type:'PAUSE',value:true});
+    }else if(pausedByOrientation&&!document.hidden){
+      pausedByOrientation=false;game.dispatch({type:'PAUSE',value:false});
+    }
+  }
+  ui?.setOrientationBlocked?.(orientationBlocked);
+  world?.setLayout?.(ui?.getLayout?.().worldRect);
+}
+// A second finger can land on the safe-area padding (HTML rather than Canvas).
+// Keep the gesture gate at document scope so map picks are canceled there too.
+document.addEventListener('pointerdown',event=>{
   heldPointers.add(event.pointerId);
   if(heldPointers.size>1||event.isPrimary===false){multiPointer=true;cancelInput();event.preventDefault();return;}
   primaryPointer=event.pointerId;
 },{capture:true});
-for(const type of ['pointerup','pointercancel'])canvas.addEventListener(type,event=>{
+for(const type of ['pointerup','pointercancel'])document.addEventListener(type,event=>{
   heldPointers.delete(event.pointerId);
   const ignored=multiPointer||primaryPointer!==null&&primaryPointer!==event.pointerId;
   if(type==='pointercancel'||ignored)cancelInput();
@@ -96,9 +117,11 @@ async function boot(){
       onReducedMotion:value=>{settings.reducedMotion=value;world?.setReducedMotion?.(value);ui.setSettings(settings);persist();},
       onNewSession:newSession});
     ui.setSettings(settings);
+    fitViewport();
     engine.runRenderLoop(()=>{
       const now=performance.now(),dt=Math.min(.1,(now-lastFrame)/1000);lastFrame=now;
       if(document.hidden)return;
+      world?.setLayout?.(ui?.getLayout?.().worldRect);
       world?.update(dt);
       if(world?.projectPlaces)ui.setPlaces?.(world.projectPlaces());
       scene.render();frameCount++;
@@ -110,6 +133,7 @@ async function boot(){
       onPlaceTap:placeId=>command({type:'TRAVEL',placeId}),
       onArrival:()=>{if(started)game.dispatch({type:'ARRIVE'});},reducedMotion:settings.reducedMotion});
     world.setMap(previous.map);world.sync(previous);
+    fitViewport();
     await resources.warm();
     resources.stats.ready=true;ready=true;ui.ready();
     game.subscribe((state,events)=>{
@@ -139,14 +163,19 @@ async function boot(){
   }catch(error){fail(error);}
   finally{loading=false;}
 }
-window.addEventListener('resize',()=>{engine?.resize();});
-window.addEventListener('blur',()=>{primaryPointer=null;heldPointers.clear();multiPointer=false;cancelInput();if(started)game.dispatch({type:'PAUSE',value:true});audio?.stop();});
-document.addEventListener('visibilitychange',()=>{if(document.hidden){primaryPointer=null;heldPointers.clear();multiPointer=false;cancelInput();audio?.stop();if(started)game.dispatch({type:'PAUSE',value:true});}lastFrame=performance.now();});
-window.addEventListener('pagehide',()=>audio?.stop());
+window.addEventListener('resize',fitViewport);
+window.visualViewport?.addEventListener('resize',fitViewport);
+window.addEventListener('orientationchange',()=>requestAnimationFrame(fitViewport));
+window.addEventListener('blur',()=>{pausedByOrientation=false;primaryPointer=null;heldPointers.clear();multiPointer=false;cancelInput();if(started)game.dispatch({type:'PAUSE',value:true});audio?.stop();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){pausedByOrientation=false;primaryPointer=null;heldPointers.clear();multiPointer=false;cancelInput();audio?.stop();if(started)game.dispatch({type:'PAUSE',value:true});}else fitViewport();lastFrame=performance.now();});
+window.addEventListener('pagehide',()=>{pausedByOrientation=false;cancelInput();audio?.stop();if(started)game.dispatch({type:'PAUSE',value:true});});
+window.addEventListener('pageshow',fitViewport);
 document.querySelector('#graphics-error button').addEventListener('click',()=>location.reload());
 if(testMode)Object.defineProperty(window,'__townTest',{value:Object.freeze({
   snapshot:()=>({state:game.getState(),ready,started,resources:resources?.stats,audio:audio?.stats(),world:world?.getState(),
-    bounds:ui?.getBounds(),places:world?.projectPlaces(),settings:{...settings},frames:frameCount,manifest:RESOURCE_MANIFEST,
+    bounds:ui?.getBounds(),places:world?.projectPlaces(),layout:ui?.getLayout?.(),orientationBlocked,
+    standalone:window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true,
+    settings:{...settings},frames:frameCount,manifest:RESOURCE_MANIFEST,
     vehicleMaterials:scene?.meshes.filter(m=>m.name.startsWith(`${game.getState().vehicleId}:`)&&m.material).map(m=>({name:m.name,lights:m._lightSources?.length,
       kind:m.material.getClassName(),color:m.material.albedoColor?.asArray(),textureReady:m.material.albedoTexture?.isReady(),enabled:m.isEnabled()})),
     render:{width:engine?.getRenderWidth(),height:engine?.getRenderHeight(),meshes:scene?.meshes.length,materials:scene?.materials.length,textures:scene?.textures.length,
