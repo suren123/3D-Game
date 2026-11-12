@@ -19,6 +19,7 @@ import '@babylonjs/core/Culling/ray.js';
 import { GOODS, PLACES } from './catalog.js';
 import { buildRoadPath, createRoadMotion, advanceRoadMotion } from './motion.js';
 import { createModelPreview } from './model-preview.js';
+import { planStreets } from './street-layout.js';
 
 // The world only presents rules state. Models arrive fully parsed in the asset
 // registry; neither this module nor a later map change opens a network request.
@@ -71,6 +72,8 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   const aim = Vector3.Zero();
   const position = new Vector3(0, .14, 0);
   const mapInstances = [], places = new Map(), placement = new Map();
+  let streetInfo = {tileCount: 0, junctionCount: 0, decorationIds: [], decorationCount: 0, roadModelIds: []};
+  let roadworkInstances = [];
   let cosmeticState = 71891;
   const cosmetic = () => ((cosmeticState = (Math.imul(cosmeticState, 1664525) + 1013904223) >>> 0) / 4294967296);
   function own(mesh, parent = mapRoot) { mesh.parent = parent; mesh.isPickable = false; mesh.receiveShadows=true; return mesh; }
@@ -98,18 +101,10 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   function decoration(key, p, scale = 1, rotation = 0) {
     const instance = instantiate(key, mapRoot, p, scale, rotation); mapInstances.push(instance); return instance.wrapper;
   }
-  function road(a, b) {
-    const dx = b.x - a.x, dz = b.z - a.z, length = Math.hypot(dx, dz);
-    if (length < .01) return;
-    const center = [(a.x + b.x) / 2, .075, (a.z + b.z) / 2];
-    const border = box('road-shoulder', center, [3.65, .10, length + .9], '#ebe4d2');
-    border.rotation.y = Math.atan2(dx, dz);
-    const lane = box('road', [center[0], .14, center[2]], [3, .07, length + .25], '#a8b6ae');
-    lane.rotation.y = border.rotation.y;
-    for (let d = 1.8; d < length - .7; d += 2.5) {
-      const dash = box('road-dash', [a.x + dx * d / length, .185, a.z + dz * d / length], [.10, .025, .8], '#f6edcd');
-      dash.rotation.y = lane.rotation.y;
-    }
+  function streetDecoration(key, p, scale = 1, rotation = 0) {
+    streetInfo.decorationCount++;
+    if (!streetInfo.decorationIds.includes(key)) streetInfo.decorationIds.push(key);
+    return decoration(key, p, scale, rotation);
   }
   function buildingPosition(place, index) {
     // Pick an unoccupied diagonal quadrant at the road node. Roads only occupy
@@ -161,6 +156,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   function setMap(nextMap) {
     moving = false; motion = null; destination = null; departureTurn=null; clearCargoAnimation();
     for (const instance of mapInstances.splice(0)) instance.dispose();
+    roadworkInstances = [];
     mapRoot?.dispose(false, false); mapRoot = new TransformNode('map-root', scene);
     shadows.getShadowMap().renderList=[];
     if(vehicle)for(const mesh of vehicle.getChildMeshes())if(mesh.getTotalVertices())shadows.addShadowCaster(mesh);
@@ -179,22 +175,25 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     box('sand-island', [0,-.45,0], [mapRadius*2+.7,.3,mapRadius*2+.7], '#eee4cd');
     box('grass-island', [0,-.20,0], [mapRadius*2,.45,mapRadius*2], land);
     const nodes = new Map(map.nodes.map(n=>[n.id,n]));
-    for(const edge of map.edges){const a=nodes.get(edge[0]),b=nodes.get(edge[1]);if(a&&b)road(a,b);}
-    for(const node of map.nodes) disc('intersection',node.x,node.z,2.25,'#a8b6ae',.16);
+    const streetPieces = planStreets(map);
+    streetInfo = {tileCount: streetPieces.length, junctionCount: streetPieces.filter(p=>p.kind==='node').length,
+      decorationCount: 0, decorationIds: [], roadModelIds: [...new Set(streetPieces.map(p=>p.id))]};
+    for (const piece of streetPieces) {
+      const tile = decoration(piece.id, piece.position, 1, piece.rotation);
+      tile.scaling.set(...piece.scale);
+    }
     map.places.forEach((place,index)=>{
       places.set(place.id,place);
       const p = buildingPosition(place,index); placement.set(place.id,p);
       const meta = PLACES.find(x=>x.id===place.id);
       box('front-garden',[p.x,.065,p.z],[6,.08,5.6],'#e8e7d4');
-      const building=decoration(place.id,[p.x,.12,p.z],1.24,p.rotation);
+      const building=decoration(place.id,[p.x,.12,p.z],['school','hospital','shop'].includes(place.id)?1:1.24,p.rotation);
       // A generous hitbox makes both small facade details and roofs tappable.
       for (const mesh of building.getChildMeshes()) mesh.isPickable = false;
       const hit=own(MeshBuilder.CreateBox(`hit-${place.id}`,{width:5.7,height:4.8,depth:5.7},scene));
       hit.position.set(p.x,2,p.z);hit.visibility=0;hit.isPickable=true;hit.metadata={placeId:place.id};
       const sign=disc('place-badge',place.x+1.9,place.z, .42,meta?.color||'#f4c566',.2);
       sign.metadata={placeId:place.id};sign.isPickable=true;
-      if(place.id!=='park')decoration('flowers',[p.x-1.1,.12,p.z+(p.rotation?1.7:-1.7)],.9,p.rotation);
-      decoration('planter',[p.x+2.2,.12,p.z-2.1],3);
       decoration('oak',[p.x-2.4,.12,p.z+1.5],2.15);
     });
     // Small neighbourhood silhouettes on the outer rim keep the playable
@@ -209,23 +208,44 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     }
     const xs=[...new Set(map.nodes.map(n=>n.x))].sort((a,b)=>a-b);
     const zs=[...new Set(map.nodes.map(n=>n.z))].sort((a,b)=>a-b);
+    const gardenCenters=[...placement.values()];
     for(let xi=0;xi<xs.length-1;xi++)for(let zi=0;zi<zs.length-1;zi++){
       const x=(xs[xi]+xs[xi+1])/2,z=(zs[zi]+zs[zi+1])/2;
       if([...placement.values()].some(p=>Math.hypot(p.x-x,p.z-z)<5))continue;
       box('residential-garden',[x,.06,z],[5.5,.08,5.3],'#d9dfc3');
       decoration(['home-a','home-c','home-f'][(xi+zi)%3],[x,.12,z],3.15,Math.PI);
+      gardenCenters.push({x,z});
       decoration('planter',[x+1.7,.12,z-2.1],2.4);
       decoration('oak',[x-2,.12,z+1.4],1.8);
     }
-    for(const node of map.nodes){
-      if(!map.edges.some(([a,b])=>{const other=nodes.get(a===node.id?b:b===node.id?a:null);return other&&other.x===node.x&&other.z>node.z;}))continue;
-      for(let k=0;k<5;k++)box('crosswalk',[node.x-1+k*.5,.193,node.z+2.05],[.28,.025,.85],'#f6f2dc');
-    }
-    for(const place of map.places.filter(p=>p.id==='park'||p.id==='school')){
-      const p=placement.get(place.id);decoration('bench',[p.x-2.2,.1,p.z+.5],1,Math.PI/2);
+    // A few lamps sit outside straight edge midpoints, leaving junctions and
+    // the large landmark touch targets clear. No procedural street markings.
+    const streetSpots=[];
+    const addStreetSpot=(x,z,rotation)=>{
+      if(streetSpots.length>=6||gardenCenters.some(p=>Math.hypot(p.x-x,p.z-z)<3.3)||streetSpots.some(p=>Math.hypot(p.x-x,p.z-z)<3))return false;
+      const kind=streetSpots.length%3;
+      streetDecoration(['street-lamp','street-bench','street-flower'][kind],[x,.06,z],[3.2,1.65,1.25][kind],rotation);
+      streetSpots.push({x,z});return true;
+    };
+    map.edges.forEach(([aId,bId], index)=>{
+      const a=nodes.get(aId),b=nodes.get(bId);if(!a||!b)return;
+      const dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz);
+      for(const side of [index%2?1:-1,index%2?-1:1]){
+        const x=(a.x+b.x)/2-dz/length*2.55*side,z=(a.z+b.z)/2+dx/length*2.55*side;
+        if(addStreetSpot(x,z,Math.atan2(dz*side,-dx*side)))break;
+      }
+    });
+    // Exterior verge fallback keeps all three small street models visible when
+    // seeded landmarks occupy most inner blocks. These points are beyond every
+    // road endpoint and still inside the board; they never narrow a lane.
+    if(streetSpots.length<3){
+      const verge=mapRadius-3;
+      for(const t of [0,-6,6,-11,11])for(const [x,z,rotation]of [[-verge,t,Math.PI/2],[verge,t,-Math.PI/2],[t,-verge,0],[t,verge,Math.PI]]){
+        if(streetSpots.length<3)addStreetSpot(x,z,rotation);
+      }
     }
     if(theme==='farm'){
-      for(let i=0;i<5;i++){box('crop-bed',[-mapRadius+4,.10,-8+i*1.4],[3,.15,.85],'#b29568');for(let j=0;j<3;j++)decoration('bush',[-mapRadius+3+j,.18,-8+i*1.4],.45);}
+      for(let i=0;i<5;i++){box('crop-bed',[-mapRadius+4,.10,-8+i*1.4],[3,.15,.85],'#b29568');for(let j=0;j<3;j++)decoration('hedge',[-mapRadius+3+j,.18,-8+i*1.4],1.1);}
     }else if(theme==='coast'){
       for(let i=0;i<5;i++)box('wave',[mapRadius+3+i*.8,-1.12,-9+i*4],[2.5,.03,.12],'#e2f1e9');
       box('pier',[mapRadius-1,-.1,0],[5,.3,2.5],'#c69565');
@@ -366,6 +386,11 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     if(next.phase!=='moving'&&moving){moving=false;motion=null;destination=null;departureTurn=null;}
     const blockSignature = JSON.stringify(next.blockedEdges || []);
     if (blockSignature !== blockedKey) {
+      for(const instance of roadworkInstances){
+        const index=mapInstances.indexOf(instance);if(index!==-1)mapInstances.splice(index,1);
+        instance.dispose();
+      }
+      roadworkInstances=[];
       blockedKey = blockSignature; roadworksRoot?.dispose(false, false);
       roadworksRoot = new TransformNode('roadworks', scene); roadworksRoot.parent = mapRoot;
       for (const [from, to] of next.blockedEdges || []) {
@@ -373,11 +398,11 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
         if (!a || !b) continue;
         const group = new TransformNode('roadworks-barrier', scene); group.parent = roadworksRoot;
         group.position.set((a.x+b.x)/2, .2, (a.z+b.z)/2); group.rotation.y = Math.atan2(b.x-a.x,b.z-a.z);
-        box('barrier', [0,.7,0], [2.7,.35,.18], '#f1be68', group);
+        const fence=instantiate('street-fence',group,[0,0,0],6.5,Math.PI/2);
+        mapInstances.push(fence);roadworkInstances.push(fence);
         for (const x of [-1,1]) {
-          box('barrier-leg', [x,.33,0], [.14,.7,.45], '#f4f0dd', group);
-          const cone = own(MeshBuilder.CreateCylinder('safety-cone', {diameterBottom:.5,diameterTop:.08,height:.6,tessellation:8}, scene), group);
-          cone.position.set(x,.3,-.5); cone.material = mat('#ef9274');
+          const cone=instantiate('street-cone',group,[x,0,-.5],6);
+          mapInstances.push(cone);roadworkInstances.push(cone);
         }
       }
     }
@@ -478,7 +503,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     cancelInput(){pressed=null;heldPointers.clear();multiPointerGesture=false;},
     setPaused(value){paused=!!value;pressed=null;},
     setReducedMotion(value){reducedMotion=!!value;if(value){for(const p of particles.particles)p.isVisible=false;particles.setParticles();}},
-    getState(){return {position:{x:position.x,y:position.y,z:position.z},moving,location,vehicleId,speed:motion?.speed||0,heading:vehicle?.rotation.y||0,curvature:motion?.curvature||0,cargoAnimation:cargoAnimation?{time:cargoAnimation.time,count:cargoAnimation.items.length}:null,cargoMeshCount:cargoRoot?.getChildMeshes().length||0,meshCount:scene.meshes.length,orphanMeshCount:scene.meshes.filter(m=>m!==particleMesh&&!m.metadata?.modelPreview&&!m.isDescendantOf(mapRoot)&&!m.isDescendantOf(vehicle)).length,particleCount:particles.particles.filter(p=>p.isVisible).length,particleLimit:96,weather:rainTime>0?'rain':'clear',preview:{...modelPreview.getState(),zoom:previewZoom},camera:{overview:overviewMode,halfHeight:currentHalfHeight,target:{x:aim.x,z:aim.z}},theme:map?.theme,landmarks:[...placement].map(([id,p])=>({id,rotation:p.rotation}))};},
+    getState(){return {streetInfo:{...streetInfo,decorationIds:[...streetInfo.decorationIds],roadModelIds:[...streetInfo.roadModelIds],roadworkModelIds:roadworkInstances.length?['street-fence','street-cone']:[]},position:{x:position.x,y:position.y,z:position.z},moving,location,vehicleId,speed:motion?.speed||0,heading:vehicle?.rotation.y||0,curvature:motion?.curvature||0,cargoAnimation:cargoAnimation?{time:cargoAnimation.time,count:cargoAnimation.items.length}:null,cargoMeshCount:cargoRoot?.getChildMeshes().length||0,meshCount:scene.meshes.length,orphanMeshCount:scene.meshes.filter(m=>m!==particleMesh&&!m.metadata?.modelPreview&&!m.isDescendantOf(mapRoot)&&!m.isDescendantOf(vehicle)).length,particleCount:particles.particles.filter(p=>p.isVisible).length,particleLimit:96,weather:rainTime>0?'rain':'clear',preview:{...modelPreview.getState(),zoom:previewZoom},camera:{overview:overviewMode,halfHeight:currentHalfHeight,target:{x:aim.x,z:aim.z}},theme:map?.theme,landmarks:[...placement].map(([id,p])=>({id,rotation:p.rotation}))};},
     dispose(){
       scene.onPointerObservable.remove(observer);engine.onResizeObservable.remove(resizeObserver);
       canvas?.removeEventListener('pointercancel',cancel);canvas?.removeEventListener('lostpointercapture',cancel);

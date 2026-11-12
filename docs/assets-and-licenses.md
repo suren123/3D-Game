@@ -10,9 +10,12 @@
 | City Kit Suburban 2.0 | https://kenney.nl/assets/city-kit-suburban ；3种住宅、花箱及原始共享纹理 | CC0，`public/models/kenney-suburban/License.txt` |
 | Nature Kit 2.1 | https://kenney.nl/assets/nature-kit ；橡树、高树和灌木 | CC0，`public/models/kenney-nature/License.txt` |
 | Interface Sounds | https://kenney.nl/assets/interface-sounds ；click_001、pluck_001、confirmation_001 三个短音效 | CC0 1.0，保留原License.txt |
-| Mini Shop 2.1 | https://kenney.nl/assets/mini-shop ；精选货架 `shelf-boxes`、果蔬台 `display-fruit`、收银台 `cash-register`，组合进商店地标 `town-v2/shop.glb` | CC0 1.0，原文 `public/models/kenney-mini/mini-shop-License.txt` |
+| Mini Shop 2.1 | https://kenney.nl/assets/mini-shop ；当前商店使用 `display-fruit`，旧货架/收银台组合保留为源参考 | CC0 1.0，原文随kenney-landmarks与kenney-mini保存 |
 | Mini Forest 1.0 | https://kenney.nl/assets/mini-forest ；精选帐篷 `tent`、松树 `tree`、路旗 `flag`、石头 `stones`，组合进营地地标 `town-v2/camp.glb` | CC0 1.0，原文 `public/models/kenney-mini/mini-forest-License.txt` |
-| 16 个小镇 GLB | `public/models/town-v2/`：原14个原创模型增加圆角和明显地标，新增商店、营地由原创外壳/地台与上述Kenney Mini模型组合，生成器 `scripts/generate_models.mjs` | 原创部分归本项目；Mini几何与原色图为CC0，不能将这两个组合模型称为纯原创 |
+| 旧版16个小镇 GLB（当前精选7个原创与营地） | `public/models/town-v2/`：原14个原创模型增加圆角和明显地标，新增商店、营地由原创外壳/地台与上述Kenney Mini模型组合，生成器 `scripts/generate_models.mjs` | 原创部分归本项目；Mini几何与原色图为CC0，不能将这两个组合模型称为纯原创 |
+| City Kit Commercial 2.1 + Suburban 2.0 | building-c医院、building-type-b学校、building-e商店；增加项目大标识和独立新增雨篷，三栋原始房壳保留 | CC0原几何与色图，项目新增部分单独标记；kenney-landmarks/sources.json及三份原License |
+| City Kit Roads 2.2 | 原版直路、方形转角、丁字/十字/尽头路片、方头路灯、施工栏与锥桶 | CC0，kenney-streets/licenses；原图与SHA记录 |
+| Coaster Kit 1.0 | 原版长椅、花卉 | CC0，kenney-streets/licenses/coaster-kit-License.txt |
 | 主屏幕应用图标 | `scripts/generate_app_icons.mjs` 生成180/192/512/32像素PNG，沿用项目小车造型 | 项目原创，无新增第三方资源 |
 | GUI 图形 | `src/v2/ui.js` 的物品、按钮矢量图标；地点和车辆图标由实际分发GLB离线渲染为 `public/icons/models/` 的PNG，`sources.json`记录模型哈希 | 矢量图形项目原创；渲染图沿用所用模型许可，无远程字体 |
 | 中文语音 | edge-tts 7.3.1 根据项目公开文案生成的48段MP3 | 非Kenney资源，不标为CC0；生成工具不随网页分发 |
@@ -22,7 +25,9 @@ Kenney 文件来自官方原始下载，无第三方镜像。CC0 允许个人、
 
 音效由原OGG转换为WAV，PCM16、单声道、22050Hz，音量为原始0.5，合计21690字节。原创模型为离线导出的GLB2.0，嵌入二进制和颜色；两个Mini组合地标嵌入其原始PNG色图，均无外部贴图请求。视觉样板保留原始PBR材料、共享模型材料并加入实时阴影。
 
-## Mini资源选择与再生成
+## 旧版Mini组合资源选择与再生成
+
+以下记录旧版Mini商店的可重生成源资产；当前运行商店映射为`kenney-landmarks/shop.glb`，营地仍用`town-v2/camp.glb`。
 
 已查看两套官方预览后按实际场景选择7个模型，未将整套FBX、OBJ、预览、角色或武器放入项目。`scripts/import_mini_assets.py --download` 通过官方资产页取得下载，仅将所选GLB及原License写入 `public/models/kenney-mini/`；压缩包仅缓存在 `/tmp`。临时下载链接和Cookie不进入仓库或日志。`sources.json` 记录来源页、原包路径、原始与分发文件SHA-256、许可和字节数。模型仅把原有共享PNG嵌入GLB，保留原几何、材质、UV和节点变换。
 
@@ -44,14 +49,18 @@ Kenney 文件来自官方原始下载，无第三方镜像。CC0 允许个人、
 
 工具 https://github.com/rany2/edge-tts ，音色 `zh-CN-XiaoxiaoNeural`，rate `-10%`、volume `-10%`。`src/v2/dialogue.js` 是有限文案源，生成器 `scripts/generate_voice_v2.py` 复用严格TLS与ffprobe校验流程，`public/audio/voice-v2/manifest.json` 记录文案与文件对应。任务通过已生成的物品、数量、地点、连接词组合，不在游玩期间联网合成或使用浏览器在线语音后备。
 
-当前样板包含27个模型、51个声音、15个模型图标、2个共享纹理，共95个运行资源文件；当前原始资源4743831字节（约4.74MB；准确值随内容变化由检查脚本给出），另有首屏打包的引擎JS和CSS。所有语音和音效在开始前解码成AudioBuffer；第一次点击解锁音频设备。声音不可解码或资源缺失会在Canvas提示重试，不带着缺失资源开局。
+当前样板包含32个模型、51个声音、15个模型图标、2个共享纹理，共100个运行资源文件；当前原始资源4480057字节（约4.48MB；准确值随内容变化由检查脚本给出），另有首屏打包的引擎JS和CSS。所有语音和音效在开始前解码成AudioBuffer；第一次点击解锁音频设备。声音不可解码或资源缺失会在Canvas提示重试，不带着缺失资源开局。
 
 ## 参考但未引入
 
-Kenney City Kit (Roads)、UI Pack、UI Audio 已参考风格或作为候选；本轮没有导入它们的资源文件。没有调用 image2 或其他生图工具。V1黄色出租车、旧语音与Three.js源码保留在仓库历史参考，V2入口不会请求它们。
+Kenney UI Pack、UI Audio仅作为候选；City Kit Roads已经引入当前版本。没有调用 image2 或其他生图工具。V1黄色出租车、旧语音与Three.js源码保留在仓库历史参考，V2入口不会请求它们。
 
 Three.js 0.180.0及其MIT许可仍随旧版参考保留；Vite为MIT构建工具。真实扬声器听感、目标设备显示效果需用户试玩，不把可解码与云端截图等同于真机验收。
 
 浏览器可能自行延后请求安装用manifest或Apple图标。游戏离线验证单独核对模型、纹理、声音与运行代码；浏览器安装探测请求不等同于游玩中的资源懒加载。
 
 营地组合中的帐篷按固定镜头校正旋转180°，入口面向可见正面；这仅改变组合节点变换，保留原始Mini源GLB。任务地标不会再按随机街区位置转成背面。
+
+## 当前Kenney道路与建筑再生成
+
+`python scripts/compose_kenney_landmarks.py` 使用随库原始输入离线生成三栋建筑；`python scripts/import_kenney_streets.py --library /workspace/kenney-3d-library/2026-11-12` 从本地完整原包库导入精选道路/道具，不访问网络。原包来源、原始和分发hash、所有依赖纹理均记录。构建检查验证许可证、分发hash与图标hash。预加载与图标烘焙不再全局覆写粗糙度或金属度；仅Nature Kit 2.1三件植被修正旧导出文件的metallic=1为0，匹配官方哑光树叶/树干外观，原色和粗糙度不改。详见[官方预览与场景对照](kenney-visual-reference.md)。

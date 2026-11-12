@@ -4,11 +4,12 @@
 Python uses system CA trust for managed HTTPS inspection. Playwright receives
 only those real deployed responses; no TLS bypass or local asset substitution.
 """
-import asyncio,json,os,re,urllib.request
+import asyncio,json,os,re,subprocess,urllib.request
 from urllib.parse import urlsplit
 from playwright.async_api import async_playwright
 from v2_browser import ROOT,OUT,snap,state,click,prepare,fill,phase
 
+EXPECTED=json.loads(subprocess.check_output(['node','--input-type=module','-e',"import{RESOURCE_MANIFEST as m}from'./src/v2/resource-manifest.js';console.log(JSON.stringify(m))"],cwd=ROOT,text=True))
 BASE=os.environ.get('TOWN_LIVE_URL','https://suren123.github.io/3D-Game/')
 def fetch(url):
  request=urllib.request.Request(url,headers={'User-Agent':'LittleTownDeploymentCheck','Accept-Encoding':'identity','Cache-Control':'no-cache'})
@@ -37,11 +38,11 @@ async def run():
   await ctx.route('**/*',transport)
   p=await ctx.new_page();p.on('pageerror',lambda e:errors.append(str(e)))
   try:
-   await p.goto(BASE+'?test=1&seed=2&v=town-mini-routes-1',wait_until='domcontentloaded')
+   await p.goto(BASE+'?test=1&seed=2&v='+EXPECTED['version'],wait_until='domcontentloaded')
    await p.wait_for_function('window.__townTest?.snapshot().ready',timeout=120000)
-   s=await snap(p);assert s['manifest']['version']=='town-mini-routes-1'
+   s=await snap(p);assert s['manifest']['version']==EXPECTED['version']
    assert s['resources']['icons']==15 and s['audio']['count']==51
-   assert sum(r['path'].endswith('.glb') for r in requests)==27
+   assert sum(r['path'].endswith('.glb') for r in requests)==len(EXPECTED['models'])
    assert sum(r['path'].endswith('.mp3') for r in requests)==48
    assert sum(r['path'].startswith('icons/models/') for r in requests)==15
    baseline=len(requests)
@@ -63,7 +64,7 @@ async def run():
    assert (await state(p))['phase']=='reward' and not (await state(p))['paused']
    assert len(requests)==baseline,requests[baseline:]
    assert not errors,errors
-   print('PASS live current bundle, 27 models/15 icons/48 voices, direct shop delivery, cargo cleanup, model viewer, no later requests',flush=True)
+   print('PASS live current bundle, current models/15 icons/48 voices, direct shop delivery, cargo cleanup, model viewer, no later requests',flush=True)
   finally:
    try:(OUT/'live-mini-verification.json').write_text(json.dumps({'url':BASE,'bundle':expected,'status':status,'requests':requests,'errors':errors,'snapshot':await snap(p),'transport':'Actual deployed HTTPS responses using system CA verification; no local assets substituted.','limitations':'Software Chromium, no physical iPad test.'},ensure_ascii=False,indent=2))
    finally:await browser.close()

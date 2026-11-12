@@ -32,7 +32,7 @@ window.bakeModelIcon = async id => {
   const item=RESOURCE_MANIFEST.models.find(x=>x.id===id);
   const container=await LoadAssetContainerAsync(new URL('../'+item.path,location.href).href,scene);
   container.addAllToScene();
-  for(const m of container.materials)if(m.albedoColor){m.metallic=0;m.roughness=.85;}
+  // Match the game: retain each GLB's authored material properties.
   let min=new Vector3(Infinity,Infinity,Infinity),max=new Vector3(-Infinity,-Infinity,-Infinity);
   for(const mesh of container.meshes){
     if(!mesh.getTotalVertices())continue;

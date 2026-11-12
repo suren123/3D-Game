@@ -8,12 +8,12 @@
     "sha256": "8b814b0b0842eb363f79b74c0ec1c96466c19a97530082eb096385e4ca80896e"
   },
   "school": {
-    "model": "models/town-v2/school.glb",
-    "sha256": "bd673825af3bc0a94af18cd5aacbca2ef3c0183b89b2e8dd3990d05b42e77269"
+    "model": "models/kenney-landmarks/school.glb",
+    "sha256": "9685b677e0eaf67f5ea160ac6ed40e0bfb3b9e3c071fd9e9af0b2c5e98744cac"
   },
   "hospital": {
-    "model": "models/town-v2/hospital.glb",
-    "sha256": "37301b9b18ffce2b6c863443cc16a9ed0d89dbf4c4c0b456f1f10677643f51c3"
+    "model": "models/kenney-landmarks/hospital.glb",
+    "sha256": "ff1c46c6a062b11feb31c6d89e70c51838ab3ff0e9339053d652715066980b1e"
   },
   "farm": {
     "model": "models/town-v2/farm.glb",
@@ -28,8 +28,8 @@
     "sha256": "ace38db48ecfcb0ba24f7615420a6d68b0cef2496103770feac2a68b1fe93ec2"
   },
   "shop": {
-    "model": "models/town-v2/shop.glb",
-    "sha256": "c8035479ec191965c77e0995219aea0929a6675f1b9b1fda01c943cecd4d87fa"
+    "model": "models/kenney-landmarks/shop.glb",
+    "sha256": "99640997ff0ecfa9d567b8763e025fcdec50268a8ea420b1c10298dfff616c43"
   },
   "camp": {
     "model": "models/town-v2/camp.glb",

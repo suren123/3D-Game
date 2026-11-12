@@ -4,7 +4,7 @@
 
 **试玩：https://suren123.github.io/3D-Game/**
 
-当前版本保留暖色玩具小镇画风、右侧独立操作区与[iPad 主屏幕启动适配](docs/ipad-installation.md)，加入 Kenney Mini 商店与营地、模型实物图标、4×4 街区以及平滑行驶和短装卸动画。
+当前版本保留暖色玩具小镇画风、右侧独立操作区与[iPad 主屏幕启动适配](docs/ipad-installation.md)，使用 Kenney 道路与街边设施、学校/医院/商店改造样板和 Mini 营地，保留模型实物图标、4×4 街区、平滑行驶和短装卸动画。
 
 ## V2 玩法
 
@@ -14,7 +14,8 @@
 - 先看图听任务，主动点“记住了”；随后自主选车、装货、选地点、交货。“再看 / 再听”随时免费，没有倒计时、扣分或生命值。
 - 入门没有突发事件；其他难度每局最多一次修路、补货、载量变化或轮胎维修。可以绕行、找备用货架、分趟取货、打气或求助。
 - 全 Canvas 界面：左侧小镇、右侧任务/装货/交货面板；装好出发自动展示全镇，驾驶只保留设置、暂停和帮助，六辆候选车可分页选择。
-- [设置 → 模型图鉴](docs/model-library.md)：查看27个资源模型，区分Kenney、自建与组合来源；固定45°斜俯视、大按钮缩放，退出保留游戏进度。
+- [Kenney 官方预览与场景对照](docs/kenney-visual-reference.md)：现成道路、街边设施，以及商店/医院/学校改造样板。
+- [设置 → 模型图鉴](docs/model-library.md)：查看32个资源模型，区分Kenney、自建与组合来源；固定45°斜俯视、大按钮缩放，退出保留游戏进度。
 - 主屏幕独立窗口声明、本地图标和安全区适配；竖屏提示横置并暂停，横屏恢复。Safari无法保证网页强制锁定方向。
 
 这些机制提供记忆与调整策略的练习机会，不等于已验证的认知训练效果。趣味性、难度和操作手感仍需要儿童实际试玩反馈。
@@ -45,6 +46,8 @@ npm run build
 # 一个终端运行静态服务，另一个执行测试
 python -m http.server 5173 --bind 127.0.0.1 --directory dist
 python tests/v2_browser.py
+python tests/v2_kenney_visual.py
+python tests/v2_model_viewer.py
 ```
 
 `TOWN_URL` 可覆盖测试地址。`?test=1` 只暴露状态和按钮屏幕坐标，不提供跳关或改状态接口。输出放在忽略提交的 `artifacts/`。旧 `src/*.js` 和旧浏览器脚本保留作 V1 实现参考，当前入口为 `src/v2/main.js`，请使用 V2 浏览器脚本。
@@ -53,6 +56,7 @@ python tests/v2_browser.py
 
 ```bash
 node scripts/generate_models.mjs
+python scripts/compose_kenney_landmarks.py
 # 另开 Vite 服务在 5174 后，重烘焙车辆与地标图标
 TOWN_DEV_URL=http://127.0.0.1:5174/ python scripts/bake_model_icons.py
 /workspace/tools/edge-tts/.venv/bin/python scripts/generate_voice_v2.py

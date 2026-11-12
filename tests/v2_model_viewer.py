@@ -2,7 +2,7 @@
 """Inspect every actual preloaded model through Canvas controls, offline."""
 import asyncio,json,subprocess
 from playwright.async_api import async_playwright
-from v2_browser import ROOT,OUT,URL,snap,state,click,prepare,is_game_request
+from v2_browser import ROOT,OUT,URL,snap,state,click,prepare,fill,is_game_request
 
 async def run():
  catalog=json.loads(subprocess.check_output(['node','--input-type=module','-e',"import{MODEL_CATALOG}from'./src/v2/model-catalog.js';console.log(JSON.stringify(MODEL_CATALOG))"],cwd=ROOT,text=True))
@@ -33,7 +33,7 @@ async def run():
       assert b['x']>=s['layout']['panelRect']['x']-2 and b['x']+b['width']<=1182,(key,b)
       assert b['y']>=0 and b['y']+b['height']<=822,(key,b)
      visited.append(expected['id'])
-     if expected['id'] in ['van','shop','camp']:
+     if expected['id'] in ['van','shop','camp','school','hospital','street-road-cross','street-lamp','street-bench']:
       await p.screenshot(path=str(OUT/f'model-viewer-{expected["id"]}.png'))
      await click(p,'model-next')
    assert set(visited)=={m['id'] for m in (await snap(p))['manifest']['models']}
@@ -49,9 +49,12 @@ async def run():
    await click(p,'model-back');assert not (await snap(p))['world']['preview']['active']
    await click(p,'back-to-town')
    after=await state(p);assert not after['paused'] and after['cargo']==before['cargo'] and after['phase']==before['phase']
+   await fill(p);await click(p,'depart');await p.wait_for_timeout(800)
+   (ROOT/'artifacts'/'kenney').mkdir(parents=True,exist_ok=True)
+   await p.screenshot(path=str(ROOT/'artifacts'/'kenney'/'final-town.png'))
    assert len(requests)==baseline,requests[baseline:]
    assert not errors,errors
-   print('PASS all 27 actual models, source labels, zoom, portrait guard, pause restoration, offline zero requests',flush=True)
+   print(f'PASS all {len(visited)} actual models, source labels, zoom, portrait guard, pause restoration, offline zero requests',flush=True)
   finally:
    try:
     await p.screenshot(path=str(OUT/'model-viewer-latest.png'))

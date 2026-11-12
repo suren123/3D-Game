@@ -33,9 +33,14 @@ export async function preloadResources(scene,audio,onProgress) {
     });
     for(const item of RESOURCE_MANIFEST.models)tasks.push(async()=>{
       const container=await LoadAssetContainerAsync(assetURL(item.path),scene);
-      // Preserve the authored PBR palette and surface response. Visual approval
-      // comes before any material simplification in this preview.
-      for(const material of container.materials)if(material.albedoColor){material.metallic=0;material.roughness=.85;}
+      // Retain authored PBR colors, texture color space, metallic and roughness.
+      // A global override changes Kenney surfaces before they reach the light.
+      // Explicit legacy Nature exception: its leaf/bark GLBs encode metallic=1,
+      // unlike their matte appearance in Kenney's reference images. Keep color
+      // and authored roughness; do not apply this correction to other packs.
+      if(item.materialPolicy==='matte-vegetation')for(const material of container.materials){
+        if(material.albedoColor)material.metallic=0;
+      }
       assets.set(item.id,container);update('把小车和房子放进小镇…');
     });
     let next=0;

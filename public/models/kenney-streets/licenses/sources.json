@@ -1,0 +1,192 @@
+[
+  {
+    "id": "street-road-straight",
+    "file": "street-road-straight.glb",
+    "sourceUrl": "https://kenney.nl/assets/city-kit-roads",
+    "pack": "city-kit-roads",
+    "originalPath": "packs/city-kit-roads/original/Models/GLB format/road-straight.glb",
+    "license": "licenses/city-kit-roads-License.txt",
+    "licenseId": "CC0-1.0",
+    "originalSha256": "f8f744fb6fc96dedd5ad1f763b550166f2624a3757bf36b4b39969d2e7cacac5",
+    "distributedSha256": "5746155704a2adb13d66f56f09e4522cc837f2ea2696eae38e913857fc806391",
+    "bytes": 16732,
+    "textureDependencies": [
+      {
+        "originalPath": "packs/city-kit-roads/original/Models/GLB format/Textures/colormap.png",
+        "sha256": "a48e2962661ae44368ffddf3054f80ed8491d082b757dcc3011184cd9a98b185"
+      }
+    ],
+    "modification": "Embed original PNG images; preserve original geometry, materials, UVs and node transforms"
+  },
+  {
+    "id": "street-road-corner",
+    "file": "street-road-corner.glb",
+    "sourceUrl": "https://kenney.nl/assets/city-kit-roads",
+    "pack": "city-kit-roads",
+    "originalPath": "packs/city-kit-roads/original/Models/GLB format/road-bend-square.glb",
+    "license": "licenses/city-kit-roads-License.txt",
+    "licenseId": "CC0-1.0",
+    "originalSha256": "5864b49931091625ad5249f34b9f1ac4614170b8a3569494a003d4ec0d47907d",
+    "distributedSha256": "6a7f6912246b49cd4f4be909e08cb0f32225804d6dae097c0412375dc210be42",
+    "bytes": 17752,
+    "textureDependencies": [
+      {
+        "originalPath": "packs/city-kit-roads/original/Models/GLB format/Textures/colormap.png",
+        "sha256": "a48e2962661ae44368ffddf3054f80ed8491d082b757dcc3011184cd9a98b185"
+      }
+    ],
+    "modification": "Embed original PNG images; preserve original geometry, materials, UVs and node transforms"
+  },
+  {
+    "id": "street-road-t",
+    "file": "street-road-t.glb",
+    "sourceUrl": "https://kenney.nl/assets/city-kit-roads",
+    "pack": "city-kit-roads",
+    "originalPath": "packs/city-kit-roads/original/Models/GLB format/road-intersection.glb",
+    "license": "licenses/city-kit-roads-License.txt",
+    "licenseId": "CC0-1.0",
+    "originalSha256": "fdf4f213abe41ddfe2a7e798a0ef1c3de5b7a68143e21c44f1893985ec6aae58",
+    "distributedSha256": "264ed185c197ce410189199a5de1872234cef13ec9c555b5fa8ba6b772e82c87",
+    "bytes": 19384,
+    "textureDependencies": [
+      {
+        "originalPath": "packs/city-kit-roads/original/Models/GLB format/Textures/colormap.png",
+        "sha256": "a48e2962661ae44368ffddf3054f80ed8491d082b757dcc3011184cd9a98b185"
+      }
+    ],
+    "modification": "Embed original PNG images; preserve original geometry, materials, UVs and node transforms"
+  },
+  {
+    "id": "street-road-cross",
+    "file": "street-road-cross.glb",
+    "sourceUrl": "https://kenney.nl/assets/city-kit-roads",
+    "pack": "city-kit-roads",
+    "originalPath": "packs/city-kit-roads/original/Models/GLB format/road-crossroad.glb",
+    "license": "licenses/city-kit-roads-License.txt",
+    "licenseId": "CC0-1.0",
+    "originalSha256": "2dc52a28cf89ec88025a047c0f6fff4c643f16b0f50f0e9a1140f16230c28b12",
+    "distributedSha256": "f44badbd46862c10bddf6a2039d0e345af3794fd21b2e129b51eff7947bfe806",
+    "bytes": 21568,
+    "textureDependencies": [
+      {
+        "originalPath": "packs/city-kit-roads/original/Models/GLB format/Textures/colormap.png",
+        "sha256": "a48e2962661ae44368ffddf3054f80ed8491d082b757dcc3011184cd9a98b185"
+      }
+    ],
+    "modification": "Embed original PNG images; preserve original geometry, materials, UVs and node transforms"
+  },
+  {
+    "id": "street-road-end",
+    "file": "street-road-end.glb",
+    "sourceUrl": "https://kenney.nl/assets/city-kit-roads",
+    "pack": "city-kit-roads",
+    "originalPath": "packs/city-kit-roads/original/Models/GLB format/road-end.glb",
+    "license": "licenses/city-kit-roads-License.txt",
+    "licenseId": "CC0-1.0",
+    "originalSha256": "bdf62518cfcc2c1a1425a4c8bc845e8e344f9c8b34dfb364b6b7d442e6171f11",
+    "distributedSha256": "a3a5a5347cadae6e2ac51ee63429d12b3c3e5eeddd82826f58342c4f7285841b",
+    "bytes": 16428,
+    "textureDependencies": [
+      {
+        "originalPath": "packs/city-kit-roads/original/Models/GLB format/Textures/colormap.png",
+        "sha256": "a48e2962661ae44368ffddf3054f80ed8491d082b757dcc3011184cd9a98b185"
+      }
+    ],
+    "modification": "Embed original PNG images; preserve original geometry, materials, UVs and node transforms"
+  },
+  {
+    "id": "street-lamp",
+    "file": "street-lamp.glb",
+    "sourceUrl": "https://kenney.nl/assets/city-kit-roads",
+    "pack": "city-kit-roads",
+    "originalPath": "packs/city-kit-roads/original/Models/GLB format/light-square.glb",
+    "license": "licenses/city-kit-roads-License.txt",
+    "licenseId": "CC0-1.0",
+    "originalSha256": "6230d136c8883d7f9bc1b86f0309077e452e26e5e1e587ef1b77abef3c5f047c",
+    "distributedSha256": "5effdad8289bde574a5ff3030c1073970a9b1c5a03baa39c6c6c5e6b991bacf6",
+    "bytes": 18480,
+    "textureDependencies": [
+      {
+        "originalPath": "packs/city-kit-roads/original/Models/GLB format/Textures/colormap.png",
+        "sha256": "a48e2962661ae44368ffddf3054f80ed8491d082b757dcc3011184cd9a98b185"
+      }
+    ],
+    "modification": "Embed original PNG images; preserve original geometry, materials, UVs and node transforms"
+  },
+  {
+    "id": "street-fence",
+    "file": "street-fence.glb",
+    "sourceUrl": "https://kenney.nl/assets/city-kit-roads",
+    "pack": "city-kit-roads",
+    "originalPath": "packs/city-kit-roads/original/Models/GLB format/construction-fence.glb",
+    "license": "licenses/city-kit-roads-License.txt",
+    "licenseId": "CC0-1.0",
+    "originalSha256": "8414c211efbc68358eb747cf6d0ad6b9ba4fbc5094603ddabaadf18e8573abbe",
+    "distributedSha256": "90e3907dab8756208d946e40fbcf3fe0bb307e492a027e663beffc8a90869936",
+    "bytes": 26340,
+    "textureDependencies": [
+      {
+        "originalPath": "packs/city-kit-roads/original/Models/GLB format/Textures/colormap.png",
+        "sha256": "a48e2962661ae44368ffddf3054f80ed8491d082b757dcc3011184cd9a98b185"
+      }
+    ],
+    "modification": "Embed original PNG images; preserve original geometry, materials, UVs and node transforms"
+  },
+  {
+    "id": "street-cone",
+    "file": "street-cone.glb",
+    "sourceUrl": "https://kenney.nl/assets/city-kit-roads",
+    "pack": "city-kit-roads",
+    "originalPath": "packs/city-kit-roads/original/Models/GLB format/construction-cone.glb",
+    "license": "licenses/city-kit-roads-License.txt",
+    "licenseId": "CC0-1.0",
+    "originalSha256": "50ceae45cd1d71f738a8f7c40f8b6b46f360063c2754bf717aae54013d6f2ee4",
+    "distributedSha256": "c5af65555d55d50a66e4d06fb16e8e1e06cde9b56637e20f29c79600124d9ea5",
+    "bytes": 18532,
+    "textureDependencies": [
+      {
+        "originalPath": "packs/city-kit-roads/original/Models/GLB format/Textures/colormap.png",
+        "sha256": "a48e2962661ae44368ffddf3054f80ed8491d082b757dcc3011184cd9a98b185"
+      }
+    ],
+    "modification": "Embed original PNG images; preserve original geometry, materials, UVs and node transforms"
+  },
+  {
+    "id": "street-bench",
+    "file": "street-bench.glb",
+    "sourceUrl": "https://kenney.nl/assets/coaster-kit",
+    "pack": "coaster-kit",
+    "originalPath": "packs/coaster-kit/original/Models/GLB format/bench.glb",
+    "license": "licenses/coaster-kit-License.txt",
+    "licenseId": "CC0-1.0",
+    "originalSha256": "186158dfd2cb41896a71e3bc73263be58458e0291456041861ecb3cb189a8461",
+    "distributedSha256": "33ed70dc4d6e7308215e0a6c3b8274df5b595169832a815b0ceadf89c372bfde",
+    "bytes": 20036,
+    "textureDependencies": [
+      {
+        "originalPath": "packs/coaster-kit/original/Models/GLB format/Textures/colormap.png",
+        "sha256": "0d4947d34ff32acf4a359c7f22ca784e057e7e72f622170a9a77b6fc88fdb70e"
+      }
+    ],
+    "modification": "Embed original PNG images; preserve original geometry, materials, UVs and node transforms"
+  },
+  {
+    "id": "street-flower",
+    "file": "street-flower.glb",
+    "sourceUrl": "https://kenney.nl/assets/coaster-kit",
+    "pack": "coaster-kit",
+    "originalPath": "packs/coaster-kit/original/Models/GLB format/flowers.glb",
+    "license": "licenses/coaster-kit-License.txt",
+    "licenseId": "CC0-1.0",
+    "originalSha256": "55b401daea0065be2be7ab85b8a80344991107e6681792dca34e685c49496306",
+    "distributedSha256": "8eb46a86ece1ce3e0b53070a7a1d61dcd6e90624a9fedb81f7a61a1782ed4054",
+    "bytes": 34700,
+    "textureDependencies": [
+      {
+        "originalPath": "packs/coaster-kit/original/Models/GLB format/Textures/colormap.png",
+        "sha256": "0d4947d34ff32acf4a359c7f22ca784e057e7e72f622170a9a77b6fc88fdb70e"
+      }
+    ],
+    "modification": "Embed original PNG images; preserve original geometry, materials, UVs and node transforms"
+  }
+]

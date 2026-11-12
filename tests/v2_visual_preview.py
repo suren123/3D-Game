@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Visual preview proof: actual Canvas inputs, offline delivery and map cleanup."""
-import asyncio,json
+import asyncio,json,subprocess
 from playwright.async_api import async_playwright
-from v2_browser import OUT,URL,snap,click,prepare,fill,phase,is_game_request
+from v2_browser import ROOT,OUT,URL,snap,click,prepare,fill,phase,is_game_request
 
 async def run():
  OUT.mkdir(parents=True,exist_ok=True)
@@ -15,7 +15,8 @@ async def run():
   baseline=len(requests);await ctx.set_offline(True)
   await click(p,'start');await prepare(p);await fill(p);await click(p,'depart');await p.wait_for_timeout(1200)
   s=await snap(p)
-  assert len(s['manifest']['models'])==27
+  expected=json.loads(subprocess.check_output(['node','--input-type=module','-e',"import{RESOURCE_MANIFEST as m}from'./src/v2/resource-manifest.js';console.log(JSON.stringify(m.models))"],cwd=ROOT,text=True))
+  assert {x['id'] for x in s['manifest']['models']}=={x['id'] for x in expected}
   assert all('place-'+place['id'] in s['bounds'] for place in s['state']['map']['places'])
   await p.screenshot(path=str(OUT/'visual-preview-overview.png'))
   step=s['state']['mission']['steps'][0]
@@ -31,7 +32,7 @@ async def run():
   assert len(requests)==baseline,requests[baseline:]
   assert not errors,errors
   (OUT/'visual-preview.json').write_text(json.dumps({'offlineDelivery':True,'allNineMarkersVisible':True,'mapCycles':cycles,'requestsAfterReady':len(requests)-baseline,'errors':errors,'limitations':'Cloud software Chromium; no physical iPad performance claim.'},ensure_ascii=False,indent=2))
-  print('PASS visual preview: 27 models, nine markers, offline delivery, ten maps without orphan meshes or new requests',flush=True)
+  print('PASS visual preview: all declared models, nine markers, offline delivery, ten maps without orphan meshes or new requests',flush=True)
   await browser.close()
 
 asyncio.run(run())

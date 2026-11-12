@@ -77,3 +77,17 @@ GitHub Actions运行43212030141成功，https://suren123.github.io/3D-Game/ 已�
 实施与本地验收done：规则/运动25项、核心浏览器15项、新商店/营地两单、三组地图输入、iPad布局与暂停保护、27模型图鉴离线、六车型装货清理、缺资源/禁存储均通过。最终构建 index-_6ohn4JB.js，资源95文件/4743831字节。main推送由现有Pages工作流发布，实际远端结果以Actions及交付回复为准；tests/v2_live.py用于验证真实部署构建、直接商店配送与图鉴，不用本地资源替换线上响应。
 
 后续：本轮优先建筑辨识已完成，不继续研究建议中的道路入口/多面立面改造。没有新开任务或改变引擎。三位子Agent请求配置均为GPT-6.1 Sol high，分别完成world/motion、Mini素材/图鉴helper、地图规则/独立审查/研究；均已停止写入。主Agent整合UI/预加载/语音/测试/发布。模型图鉴入口为设置→模型图鉴。真实iPad安装、儿童辨识和硬件帧率仍需用户试玩。
+
+## 当前执行：Kenney 街道与三地点样板（2026-11-12）
+
+- 基线 main 1d41862，开始前工作区干净；当前 running。
+- 用户同意现成Kenney模型为主，加大标识/纹理/颜色区分，并明确道路和路边装饰也优先Kenney，画面对照官方预览。
+- kenney_landmarks：请求GPT-6.1 Sol high，独占compose_kenney_landmarks.py / kenney-landmarks模型与说明，学校/医院/商店三个改造样板。
+- kenney_streets：请求GPT-6.1 Sol high，独占world.js道路装饰、street-layout/assets及导入脚本/模型/相关测试和说明。
+- 主Agent：预加载与图鉴集成、图标、官方图对照、整体浏览器验收、文档和发布。其他旧Agent没有写入任务。
+- 新模型路径kenney-landmarks/{school,hospital,shop}.glb；street-assets.js导出STREET_MODELS/STREET_CATALOG供共享入口引入。
+- 验收：资源与来源一致、无后加载、随机拓扑道路接通、装饰不拦点击、真实配送及换图/图鉴清理、原图与游戏截图对照；通过后按既有授权部署Pages。
+
+整合进展：两个子Agent已停止写入。32模型/15图标/51音频/2外部纹理，100运行文件4480057字节；30项Node测试通过。真实Chromium在海边商店、农场学校、晴天医院完成离线配送（学校触摸实物、医院鼠标实物），10次换图无孤立网格/新请求；施工围栏/锥桶展示、绕行配送和重置清理通过。修复过路口导入朝向与装饰过度避让。最终仅Nature三件旧植被将源metallic=1纠正为哑光，正在新构建跑全32模型图鉴；完成后提交发布及正式站复测。截图与报告在artifacts/kenney，官方对照在docs/kenney-visual-reference.md。
+
+最终32模型图鉴回归已通过，生产构建index-Cfx3VQlw.js；最终截图与官方对照已入文档。本地验收完成，当前进入提交/Pages发布及真实线上响应配送验证阶段。两名子Agent均已结束写入，后续由主Agent完成。

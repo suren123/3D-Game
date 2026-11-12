@@ -1,0 +1,175 @@
+[
+  {
+    "file": "school.glb",
+    "semanticUse": "school",
+    "projectAdaptation": true,
+    "notOfficialDedicatedBuilding": true,
+    "sourceLayers": [
+      {
+        "pack": "city-kit-suburban",
+        "url": "https://kenney.nl/assets/city-kit-suburban",
+        "originalLibraryPath": "packs/city-kit-suburban/original/Models/GLB format/building-type-b.glb",
+        "offlineInput": "_sources/city-kit-suburban/building-type-b.glb",
+        "originalSha256": "a964a10c51bb334be677657fd8fa483531974dd15b4243575990192818e2300e",
+        "texture": "_sources/city-kit-suburban/Textures/colormap.png",
+        "textureSha256": "9b5de86078c25ef02351a80d35ff3c978693a1044565b73eedd9ae9b5b80665d",
+        "license": "city-kit-suburban-License.txt",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "modificationLayers": [
+      {
+        "layer": "Kenney original shell",
+        "model": "city-kit-suburban/building-type-b",
+        "uniformScale": 2.35,
+        "geometryMaterialsUVsTextures": "preserved verbatim"
+      },
+      {
+        "layer": "Project additions",
+        "description": "Blue/cream open book roof sign with gold spine; no original shell reconstruction"
+      },
+      {
+        "layer": "Distribution",
+        "description": "All distinct source textures embedded; full assembly XZ centered and grounded at y=0; front -Z"
+      }
+    ],
+    "bounds": {
+      "min": [
+        -2.1479000806808473,
+        0.0,
+        -1.3394999831914902
+      ],
+      "max": [
+        2.1479000806808473,
+        3.68,
+        1.3394999831914902
+      ],
+      "size": [
+        4.2958001613616945,
+        3.68,
+        2.6789999663829804
+      ]
+    },
+    "bytes": 172300,
+    "distributedSha256": "9685b677e0eaf67f5ea160ac6ed40e0bfb3b9e3c071fd9e9af0b2c5e98744cac"
+  },
+  {
+    "file": "hospital.glb",
+    "semanticUse": "hospital",
+    "projectAdaptation": true,
+    "notOfficialDedicatedBuilding": true,
+    "sourceLayers": [
+      {
+        "pack": "city-kit-commercial",
+        "url": "https://kenney.nl/assets/city-kit-commercial",
+        "originalLibraryPath": "packs/city-kit-commercial/original/Models/GLB format/building-c.glb",
+        "offlineInput": "_sources/city-kit-commercial/building-c.glb",
+        "originalSha256": "f6887608a95a165503561730252c30506938803731c6546efca12bd47b1666bd",
+        "texture": "_sources/city-kit-commercial/Textures/colormap.png",
+        "textureSha256": "191bec3889aaaca5018380038fecc129ebb5c2182879a099b7b538b3fa050b5d",
+        "license": "city-kit-commercial-License.txt",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "modificationLayers": [
+      {
+        "layer": "Kenney original shell",
+        "model": "city-kit-commercial/building-c",
+        "uniformScale": 3.3,
+        "geometryMaterialsUVsTextures": "preserved verbatim"
+      },
+      {
+        "layer": "Project additions",
+        "description": "Large coral medical cross on cream roof placard and small coral entrance canopy"
+      },
+      {
+        "layer": "Distribution",
+        "description": "All distinct source textures embedded; full assembly XZ centered and grounded at y=0; front -Z"
+      }
+    ],
+    "bounds": {
+      "min": [
+        -1.457920029759407,
+        0.0,
+        -1.8892501258850096
+      ],
+      "max": [
+        1.457920029759407,
+        4.04,
+        1.8892501258850096
+      ],
+      "size": [
+        2.915840059518814,
+        4.04,
+        3.7785002517700192
+      ]
+    },
+    "bytes": 121192,
+    "distributedSha256": "ff1c46c6a062b11feb31c6d89e70c51838ab3ff0e9339053d652715066980b1e"
+  },
+  {
+    "file": "shop.glb",
+    "semanticUse": "shop",
+    "projectAdaptation": true,
+    "notOfficialDedicatedBuilding": false,
+    "sourceLayers": [
+      {
+        "pack": "city-kit-commercial",
+        "url": "https://kenney.nl/assets/city-kit-commercial",
+        "originalLibraryPath": "packs/city-kit-commercial/original/Models/GLB format/building-e.glb",
+        "offlineInput": "_sources/city-kit-commercial/building-e.glb",
+        "originalSha256": "edbe5b49858a3c83e72d3cf496129c06082ef3a3d6005769f8883138e275b456",
+        "texture": "_sources/city-kit-commercial/Textures/colormap.png",
+        "textureSha256": "191bec3889aaaca5018380038fecc129ebb5c2182879a099b7b538b3fa050b5d",
+        "license": "city-kit-commercial-License.txt",
+        "licenseId": "CC0-1.0"
+      },
+      {
+        "pack": "mini-shop",
+        "url": "https://kenney.nl/assets/mini-shop",
+        "originalLibraryPath": "packs/mini-shop/original/Models/GLB format/display-fruit.glb",
+        "offlineInput": "_sources/mini-shop/display-fruit.glb",
+        "originalSha256": "59d0c1451ced220614526ee6a994d44c0cadfb057a1d0738f50fdd05affb8581",
+        "texture": "_sources/mini-shop/Textures/colormap.png",
+        "textureSha256": "fbd32223a09d7ca7621c11b1a9c7efa7324f8449f18ac2aaf08b58daf76abb4b",
+        "license": "mini-shop-License.txt",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "modificationLayers": [
+      {
+        "layer": "Kenney original shell",
+        "model": "city-kit-commercial/building-e",
+        "uniformScale": 2.6,
+        "geometryMaterialsUVsTextures": "preserved verbatim"
+      },
+      {
+        "layer": "Project additions",
+        "description": "Large orange basket roof sign; original Kenney green awning remains; Kenney Mini fruit display added"
+      },
+      {
+        "layer": "Distribution",
+        "description": "All distinct source textures embedded; full assembly XZ centered and grounded at y=0; front -Z"
+      }
+    ],
+    "bounds": {
+      "min": [
+        -2.132000058889389,
+        0.0,
+        -1.6376296600699427
+      ],
+      "max": [
+        2.132000058889389,
+        3.4,
+        1.6376296600699427
+      ],
+      "size": [
+        4.264000117778778,
+        3.4,
+        3.2752593201398854
+      ]
+    },
+    "bytes": 250376,
+    "distributedSha256": "99640997ff0ecfa9d567b8763e025fcdec50268a8ea420b1c10298dfff616c43"
+  }
+]

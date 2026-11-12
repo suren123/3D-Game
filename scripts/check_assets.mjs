@@ -44,6 +44,23 @@ for(const icon of manifest.icons){
   assert.equal(data.readUInt32BE(16),256);assert.equal(data.readUInt32BE(20),256);
 }
 for(const license of ['licenses/babylon-Apache-2.0.txt','models/kenney-car/License.txt','models/kenney-suburban/License.txt','models/kenney-nature/License.txt','models/kenney-mini/mini-shop-License.txt','models/kenney-mini/mini-forest-License.txt','audio/kenney-interface/License.txt'])assert((await stat(new URL(license,root))).size>0);
+// Imported and adapted models retain their source licenses and exact shipped
+// hashes. The full external library is not needed to validate a clean checkout.
+for(const [folder,metadata] of [['kenney-streets','licenses/sources.json'],['kenney-landmarks','sources.json']]){
+  const base=new URL(`models/${folder}/`,root);
+  const records=JSON.parse(await readFile(new URL(metadata,base),'utf8'));
+  const expected=manifest.models.filter(x=>x.path.startsWith(`models/${folder}/`));
+  assert.deepEqual(records.map(x=>x.file).sort(),expected.map(x=>path.posix.basename(x.path)).sort(),`Source records must cover ${folder}`);
+  for(const record of records){
+    const data=await readFile(new URL(record.file,base));
+    assert.equal(createHash('sha256').update(data).digest('hex'),record.distributedSha256,`Stale provenance: ${record.file}`);
+    const licenses=record.sourceLayers?record.sourceLayers.map(x=>x.license):[record.license];
+    for(const file of licenses){
+      const text=await readFile(new URL(file,base),'utf8');
+      assert(/CC0|Creative Commons Zero/.test(text),`Missing CC0 license: ${folder}/${file}`);
+    }
+  }
+}
 // Home-screen files must also work when the game is served below /3D-Game/.
 const webapp=JSON.parse(await readFile(new URL('manifest.webmanifest',root),'utf8'));
 const appBase='https://example.github.io/3D-Game/';
