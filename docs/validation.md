@@ -44,4 +44,6 @@
 
 ## 发布
 
-本文件记录本地验证；正式Pages上线状态在任务交付时另核对，不能以构建通过代替已上线。
+功能提交 `41a0a8a59ee5ed96c1db39782551cb0b8b26da98` 已推送main；[Actions运行43212030141](https://github.com/suren123/3D-Game/actions/runs/43212030141) 构建和部署成功。正式地址 https://suren123.github.io/3D-Game/ 返回HTTP200。正式页面的18模型、46语音、共享纹理均实际下载，完整Canvas点击配送获得奖励，ready后没有新增资源请求。
+
+云端Chromium不信任此环境的HTTPS代理CA，因此正式站浏览器测试使用Python系统可信CA获取同一线上URL的原始响应并传入浏览器；保持TLS校验，没有用本地构建或测试替身替换线上文件。这是云端测试传输限制，不是关闭证书校验。详细资源状态、截图与流程快照保存在 `artifacts/v2/live-verification.json`、`live-town.png`、`live-complete.png`。
