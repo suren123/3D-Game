@@ -309,8 +309,10 @@ export function createUI(scene, callbacks = {}) {
     const enable = ['explore', 'delivery'].includes(lastState?.phase) && !lastState.paused && !panel;
     markersLayer.isVisible = enable;
     for (const place of PLACES) {
-      const b = button(markersLayer, `place-${place.id}`, '', 0, 0, 124, 82, () => send('TRAVEL', { placeId: place.id }), { fill: '#fffaf0ed', radius: 22 });
-      icon(b, place.id, 7, 10, 42); text(b, place.name.replace('小镇', '').replace('阳光', '').replace('彩虹', '').replace('爱心', '').replace('开心', '').replace('熊熊', '').replace('汽车', ''), 52, 8, 65, 66, 25, C.ink, 'center', true);
+      const b = button(markersLayer, `place-${place.id}`, '', 0, 0, 156, 84, () => send('TRAVEL', { placeId: place.id }), { fill: 'transparent', pressedFill: '#dce9d888', radius: 22 });
+      // Keep a large touch target while the visible sign stays above the roof.
+      const chip=box(b, `sign-${place.id}`, 0, 17, 156, 52, '#fffaf0ed', 18);
+      icon(chip, place.id, 8, 7, 38); text(chip, place.name.replace('小镇', '').replace('阳光', '').replace('彩虹', '').replace('爱心', '').replace('开心', '').replace('熊熊', '').replace('汽车', ''), 50, 0, 98, 52, 24, C.ink, 'center', true);
       b.isVisible = false; markers.set(place.id, b);
     }
     // The fixed HUD belongs above map markers, but markers do not block open sky.
@@ -320,11 +322,18 @@ export function createUI(scene, callbacks = {}) {
     const size = texture.getSize(), rect = canvas?.getBoundingClientRect();
     if (!rect?.width || !rect.height || !markersLayer?.isVisible) return;
     const ratio = texture.idealRatio || 1;
-    for (const p of projected) {
+    const placed=[];
+    for (const p of [...projected].sort((a,b)=>a.y-b.y)) {
       const b = markers.get(p.id); if (!b) continue;
       const x = p.x * size.width / rect.width / ratio, y = p.y * size.height / rect.height / ratio;
-      const left = `${Math.round(x - 62)}px`, top = `${Math.round(y - 61)}px`;
-      const visible = p.visible !== false && p.y > 140 && p.y < rect.height - 158;
+      const visible = p.visible !== false && y > 105 && y < H - 130;
+      let markerTop=Math.max(101,Math.min(H-242,y-96));
+      if(visible){
+        // Avoid stacked sign faces near the top HUD; keep their large targets.
+        for(const other of placed)if(Math.abs(other.x-x)<164&&Math.abs(other.top-markerTop)<72)markerTop=other.top+76;
+        placed.push({x,top:markerTop});
+      }
+      const left = `${Math.round(x - 78)}px`, top = `${Math.round(markerTop)}px`;
       if (b.left !== left) b.left = left;
       if (b.top !== top) b.top = top;
       if (b.isVisible !== visible) b.isVisible = visible;

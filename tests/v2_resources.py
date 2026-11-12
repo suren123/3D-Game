@@ -24,7 +24,7 @@ async def run():
    await click(p,'start');await click(p,'ack');await click(p,'vehicle-'+plan['id'])
    await fill(p);await click(p,'depart');s=await snap(p)
    assert s['world']['vehicleId']==plan['id']
-   assert s['vehicleMaterials'] and all(m['kind']=='StandardMaterial' and m['lights']==2 for m in s['vehicleMaterials'])
+   assert s['vehicleMaterials'] and all(m['kind']=='PBRMaterial' and m['lights']==2 for m in s['vehicleMaterials'])
    await p.screenshot(path=str(OUT/f"vehicle-{plan['id']}.png"))
    await finish(p)
    assert len(requests)==baseline,requests[baseline:]

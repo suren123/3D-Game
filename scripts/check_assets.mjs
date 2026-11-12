@@ -21,5 +21,5 @@ for(const file of paths){
 }
 const voiceMap=JSON.parse(await readFile(new URL('audio/voice-v2/manifest.json',root),'utf8'));
 for(const line of VOICE_LINES)assert.equal(voiceMap[line.text],line.id+'.mp3',`Stale generated voice: ${line.id}`);
-for(const license of ['licenses/babylon-Apache-2.0.txt','models/kenney-car/License.txt','audio/kenney-interface/License.txt'])assert((await stat(new URL(license,root))).size>0);
+for(const license of ['licenses/babylon-Apache-2.0.txt','models/kenney-car/License.txt','models/kenney-suburban/License.txt','models/kenney-nature/License.txt','audio/kenney-interface/License.txt'])assert((await stat(new URL(license,root))).size>0);
 console.log(JSON.stringify({models:manifest.models.length,audio:manifest.audio.length,textures:manifest.textures.length,files:paths.size,bytes,voiceLines:VOICE_LINES.length}));

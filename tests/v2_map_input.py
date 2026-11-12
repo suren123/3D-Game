@@ -16,7 +16,10 @@ async def run():
    x,y=await center(p,'place-cafe');await p.mouse.move(x,y);await p.mouse.down();await p.mouse.move(15,400,steps=8);await p.mouse.up()
    assert (await state(p))['phase']=='explore'
    await click(p,'hint');await p.mouse.click(x,y);assert (await state(p))['paused']
-   await click(p,'close-hint');await p.wait_for_timeout(250)
+   await click(p,'close-hint')
+   # A software GPU can take longer than a fixed 250 ms to lay out the newly
+   # rebuilt GUI. Wait for its actual clickable rectangle, not a guessed delay.
+   await p.wait_for_function('!!window.__townTest?.snapshot().bounds?.["place-school"]',timeout=15000)
    points={v['id']:v for v in (await snap(p))['places']};body=points['school']['building']
    # Ensure this test really taps the building below the label, not its GUI button.
    box=(await snap(p))['bounds']['place-school']
@@ -25,7 +28,8 @@ async def run():
    else:await p.mouse.click(body['x'],body['y'])
    await phase(p,'moving');assert (await state(p))['currentDestination']=='school'
    await phase(p,'delivery');assert (await state(p))['location']=='school'
-   await click(p,'overview');await p.wait_for_timeout(2500)
+   await click(p,'overview')
+   await p.wait_for_function('(()=>{const c=window.__townTest.snapshot().world.camera;return c.overview&&Math.abs(c.target.x)<.05&&Math.abs(c.target.z)<.05})()',timeout=60000)
    x,y=await center(p,'place-cafe')
    if touch:await p.touchscreen.tap(x,y)
    else:await p.mouse.click(x,y)

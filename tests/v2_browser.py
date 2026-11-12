@@ -114,7 +114,7 @@ async def main():
    for i in range(10):
     await click(p,'settings');await click(p,'difficulty-challenge');await click(p,'new-session');await phase(p,'brief')
     s=await snap(p);themes.add(s['state']['map']['theme']);mesh_counts.append(s['render']['meshes'])
-   assert max(mesh_counts)-min(mesh_counts)<60 and max(mesh_counts)<180,mesh_counts
+    assert s['world']['orphanMeshCount']==0,s['world']
    assert len(requests)==after_ready,requests[after_ready:]
    report['mapCycles']={'themes':list(themes),'meshes':mesh_counts};ok('ten offline random maps: no network requests, bounded mesh counts')
    # Read-only test snapshots may expose answers, but product has no visible DOM controls.

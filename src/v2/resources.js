@@ -1,8 +1,6 @@
 import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader.js';
 import '@babylonjs/loaders/glTF/2.0/glTFLoader.js';
 import '@babylonjs/loaders/glTF/glTFFileLoader.js';
-import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
-import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { RESOURCE_MANIFEST } from './resource-manifest.js';
 export { RESOURCE_MANIFEST } from './resource-manifest.js';
 const assetURL=path=>new URL(`${import.meta.env.BASE_URL}${path}`,document.baseURI).href;
@@ -23,20 +21,9 @@ export async function preloadResources(scene,audio,onProgress) {
     });
     for(const item of RESOURCE_MANIFEST.models)tasks.push(async()=>{
       const container=await LoadAssetContainerAsync(assetURL(item.path),scene);
-      // These matte toy assets do not need metallic/roughness lighting. Reuse
-      // their exact colours/textures with a simpler diffuse shader on iPad.
-      const replacements=new Map();
-      for(const original of container.materials){
-        if(!original.albedoColor)continue;
-        const toy=new StandardMaterial(`toy-${original.name}`,scene);
-        toy.diffuseColor=original.albedoColor.clone();toy.specularColor=Color3.Black();
-        toy.diffuseTexture=original.albedoTexture;toy.alpha=original.alpha;
-        toy.backFaceCulling=original.backFaceCulling;toy.sideOrientation=original.sideOrientation;
-        scene.removeMaterial(toy);replacements.set(original,toy);
-      }
-      for(const mesh of container.meshes)if(replacements.has(mesh.material))mesh.material=replacements.get(mesh.material);
-      container.materials=container.materials.map(material=>replacements.get(material)||material);
-      for(const original of replacements.keys())original.dispose(false,false);
+      // Preserve the authored PBR palette and surface response. Visual approval
+      // comes before any material simplification in this preview.
+      for(const material of container.materials)if(material.albedoColor){material.metallic=0;material.roughness=.85;}
       assets.set(item.id,container);update('把小车和房子放进小镇…');
     });
     let next=0;

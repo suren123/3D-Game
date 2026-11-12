@@ -5,11 +5,14 @@ import { Matrix, Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight.js';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight.js';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
-import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { PointerEventTypes } from '@babylonjs/core/Events/pointerEvents.js';
 import { SolidParticleSystem } from '@babylonjs/core/Particles/solidParticleSystem.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
+import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial.js';
+import { ImageProcessingConfiguration } from '@babylonjs/core/Materials/imageProcessingConfiguration.js';
+import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator.js';
+import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
 // Scene.pick is a warning-only stub until this side-effect registers ray picking.
 // Keep it explicit when importing individual engine modules.
 import '@babylonjs/core/Culling/ray.js';
@@ -21,27 +24,32 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   const engine = scene.getEngine();
   const canvas = engine.getRenderingCanvas();
   const lookup = key => assets instanceof Map ? assets.get(key) : assets?.[key];
-  const camera = new ArcRotateCamera('town-camera', -Math.PI / 2.8, .70, 60, Vector3.Zero(), scene);
+  const camera = new ArcRotateCamera('town-camera', -Math.PI / 4, .92, 60, Vector3.Zero(), scene);
   camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
   camera.minZ = .1; camera.maxZ = 180;
   camera.inputs.clear();
   scene.activeCamera = camera;
-  scene.clearColor = Color4.FromHexString('#dbedf0ff');
+  scene.clearColor = Color4.FromHexString('#f4f3e7ff');
   const ambient = new HemisphericLight('soft-sky', new Vector3(0, 1, 0), scene);
-  ambient.intensity = .72; ambient.groundColor = Color3.FromHexString('#b8a78b');
-  const sun = new DirectionalLight('warm-sun', new Vector3(-.6, -1, .4), scene);
-  sun.intensity = .85; sun.diffuse = Color3.FromHexString('#fff3dc');
-  scene.imageProcessingConfiguration.exposure = 1;
-  scene.imageProcessingConfiguration.contrast = 1.05;
+  ambient.intensity = 1; ambient.diffuse = Color3.FromHexString('#fff8e9'); ambient.groundColor = Color3.FromHexString('#a6b992');
+  const sun = new DirectionalLight('warm-sun', new Vector3(.5, -1, .6).normalize(), scene);
+  sun.position.set(-24,42,-28); sun.intensity = 2.5; sun.diffuse = Color3.FromHexString('#fff1d9');
+  sun.shadowMinZ=.1; sun.shadowMaxZ=120; sun.shadowOrthoScale=.15;
+  const shadows = new ShadowGenerator(2048, sun);
+  shadows.usePercentageCloserFiltering=true;
+  shadows.filteringQuality=ShadowGenerator.QUALITY_MEDIUM; shadows.bias=.0005; shadows.normalBias=.025;
+  shadows.setDarkness(.18);
+  scene.imageProcessingConfiguration.toneMappingEnabled=true;
+  scene.imageProcessingConfiguration.toneMappingType=ImageProcessingConfiguration.TONEMAPPING_ACES;
+  scene.imageProcessingConfiguration.exposure = 1.05;
+  scene.imageProcessingConfiguration.contrast = 1;
 
   const materials = new Map();
   function mat(hex, alpha = 1) {
     const key = `${hex}:${alpha}`;
     if (!materials.has(key)) {
-      const m = new StandardMaterial(`town-${key}`, scene);
-      // PBR GLBs already encode linear RGB. Match them for StandardMaterial
-      // ground too, rather than feeding sRGB into bright linear lighting.
-      m.diffuseColor = Color3.FromHexString(hex).toLinearSpace().scale(.85); m.specularColor = Color3.Black();
+      const m = new PBRMaterial(`town-${key}`, scene);
+      m.albedoColor = Color3.FromHexString(hex).toLinearSpace(); m.metallic=0; m.roughness=.92;
       m.alpha = alpha; materials.set(key, m);
     }
     return materials.get(key);
@@ -50,13 +58,13 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   let map = null, state = null, vehicleId = '', cargoKey = '', blockedKey = '', location = 'depot';
   let paused = false, moving = false, route = [], routeIndex = 0, destination = null;
   let clock = 0, weatherTime = 0, rainTime = 0, travelDust = 0, overviewMode = true;
-  let mapRadius = 20, targetHalfHeight = 23;
+  let mapRadius = 20, targetHalfHeight = 23, currentHalfHeight = 23;
   const aim = Vector3.Zero();
   const position = new Vector3(0, .14, 0);
   const mapInstances = [], places = new Map(), placement = new Map();
   let cosmeticState = 71891;
   const cosmetic = () => ((cosmeticState = (Math.imul(cosmeticState, 1664525) + 1013904223) >>> 0) / 4294967296);
-  function own(mesh, parent = mapRoot) { mesh.parent = parent; mesh.isPickable = false; return mesh; }
+  function own(mesh, parent = mapRoot) { mesh.parent = parent; mesh.isPickable = false; mesh.receiveShadows=true; return mesh; }
   function box(name, p, size, color, parent = mapRoot) {
     const m = own(MeshBuilder.CreateBox(name, { width: size[0], height: size[1], depth: size[2] }, scene), parent);
     m.position.set(...p); m.material = mat(color); return m;
@@ -71,12 +79,11 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     // Clone meshes so they join the current scene's light list. Instances of
     // detached AssetContainer sources inherit their source's (empty) light
     // list when the sources were parsed before the world lights were created.
-    // Static clones are merged by material below; moving vehicles remain small.
     const instance = container.instantiateModelsToScene(name => `${key}:${name}`, false, { doNotInstantiate: true });
     const wrapper = new TransformNode(`${key}:instance`, scene); wrapper.parent = parent;
     wrapper.position.set(...p); wrapper.scaling.setAll(scale); wrapper.rotation.y = rotation;
     for (const root of instance.rootNodes) root.parent = wrapper;
-    for (const mesh of wrapper.getChildMeshes()) { mesh.isPickable = false; mesh.receiveShadows = false; }
+    for (const mesh of wrapper.getChildMeshes()) { mesh.isPickable = false; mesh.receiveShadows = true; if(mesh.getTotalVertices())shadows.addShadowCaster(mesh); }
     return { wrapper, instance, dispose() { instance.dispose(); wrapper.dispose(); } };
   }
   function decoration(key, p, scale = 1, rotation = 0) {
@@ -86,37 +93,20 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     const dx = b.x - a.x, dz = b.z - a.z, length = Math.hypot(dx, dz);
     if (length < .01) return;
     const center = [(a.x + b.x) / 2, .075, (a.z + b.z) / 2];
-    const border = box('road-shoulder', center, [3.45, .10, length + .9], '#e8ddc2');
+    const border = box('road-shoulder', center, [3.65, .10, length + .9], '#ebe4d2');
     border.rotation.y = Math.atan2(dx, dz);
-    const lane = box('road', [center[0], .14, center[2]], [2.8, .07, length + .25], '#94a6a3');
+    const lane = box('road', [center[0], .14, center[2]], [2.8, .07, length + .25], '#a8b6ae');
     lane.rotation.y = border.rotation.y;
     for (let d = 1.8; d < length - .7; d += 2.5) {
       const dash = box('road-dash', [a.x + dx * d / length, .185, a.z + dz * d / length], [.10, .025, .8], '#f6edcd');
       dash.rotation.y = lane.rotation.y;
     }
   }
-  function batchStaticGround() {
-    const groups = new Map();
-    for (const mesh of mapRoot.getChildMeshes()) {
-      if (mesh.isAnInstance || mesh.isPickable || !mesh.material || !mesh.getTotalVertices()) continue;
-      // Original GLBs use the same finite palette. Their separate material
-      // objects can safely share one material when all relevant factors match.
-      const m = mesh.material, c = m.albedoColor || m.diffuseColor;
-      const signature = `${m.getClassName()}:${c?.toHexString()}:${m.alpha}:${m.metallic}:${m.roughness}:${mesh.sideOrientation}`;
-      const group = groups.get(signature) || []; if (group.length) mesh.material = group[0].material;
-      group.push(mesh); groups.set(signature, group);
-    }
-    for (const meshes of groups.values()) {
-      if (meshes.length < 2) continue;
-      const merged = Mesh.MergeMeshes(meshes, true, true, undefined, false, false);
-      if (merged) { merged.name = 'batched-ground'; merged.parent = mapRoot; merged.isPickable = false; merged.freezeWorldMatrix(); }
-    }
-  }
   function buildingPosition(place, index) {
     // Pick an unoccupied diagonal quadrant at the road node. Roads only occupy
     // the cardinal directions, so entrances remain clearly beside the road.
     const dirs = [[-1,-1], [1,-1], [-1,1], [1,1]];
-    const order = dirs.map(([x,z]) => ({x,z,score: x * place.x + z * place.z + cosmetic() * 2})).sort((a,b)=>b.score-a.score);
+    const order = dirs.map(([x,z]) => ({x,z,score: x * place.x + z * place.z + (z-x)*3 + cosmetic() * 2})).sort((a,b)=>b.score-a.score);
     let best = null;
     for (const dir of order) {
       const x = place.x + dir.x * 3.5, z = place.z + dir.z * 3.5;
@@ -131,7 +121,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   const particleMesh = particles.buildMesh(); particleMesh.isPickable = false; particleMesh.alwaysSelectAsActiveMesh = true;
   const particleMaterial = new StandardMaterial('particle-material', scene);
   particleMaterial.diffuseColor = Color3.White(); particleMaterial.specularColor = Color3.Black();
-  particleMaterial.disableLighting = true; particleMesh.material = particleMaterial;
+  particleMaterial.disableLighting = true; particleMaterial.emissiveColor=Color3.White(); particleMesh.material = particleMaterial;
   particles.computeParticleTexture = false;
   for (const p of particles.particles) { p.isVisible = false; p.props = { ttl: 0, max: 1, rain: false }; }
   particles.setParticles();
@@ -158,46 +148,64 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     moving = false; route = []; routeIndex = 0; destination = null;
     for (const instance of mapInstances.splice(0)) instance.dispose();
     mapRoot?.dispose(false, false); mapRoot = new TransformNode('map-root', scene);
+    shadows.getShadowMap().renderList=[];
+    if(vehicle)for(const mesh of vehicle.getChildMeshes())if(mesh.getTotalVertices())shadows.addShadowCaster(mesh);
     roadworksRoot = null; blockedKey = '';
     map = nextMap; places.clear(); placement.clear();
     cosmeticState = (Number(nextMap.seed) ^ 0x544f5953) >>> 0;
     for (const p of particles.particles) p.isVisible = false, p.props.ttl = 0;
     particles.setParticles(); rainTime = 0; weatherTime = 0;
     const coords = nextMap.nodes.flatMap(n=>[Math.abs(n.x),Math.abs(n.z)]);
-    mapRadius = Math.max(16, ...coords) + 8;
+    mapRadius = Math.max(9, ...coords) + 7.4;
     const theme = typeof map.theme === 'object' ? map.theme.id : map.theme;
-    const land = theme === 'farm' ? '#c7d99c' : theme === 'coast' ? '#c4dcc0' : '#b9d9af';
-    box('ocean', [0,-1.3,0], [140,.2,140], theme === 'coast' ? '#8acdd7' : '#badbdc');
-    box('sand-island', [0,-.75,0], [mapRadius*2+1.7,1.0,mapRadius*2+1.7], '#ecdcb6');
+    const land = theme === 'farm' ? '#cbd8ae' : theme === 'coast' ? '#c9ddbc' : '#c2d7b4';
+    box('table', [0,-1.45,0], [140,.2,140], '#f4f0e3');
+    const board=box('toy-board', [0,-.85,0], [mapRadius*2+1.4,1.0,mapRadius*2+1.4], '#8caf9d');
+    shadows.addShadowCaster(board);
+    box('sand-island', [0,-.45,0], [mapRadius*2+.7,.3,mapRadius*2+.7], '#eee4cd');
     box('grass-island', [0,-.20,0], [mapRadius*2,.45,mapRadius*2], land);
     const nodes = new Map(map.nodes.map(n=>[n.id,n]));
     for(const edge of map.edges){const a=nodes.get(edge[0]),b=nodes.get(edge[1]);if(a&&b)road(a,b);}
-    for(const node of map.nodes) disc('intersection',node.x,node.z,1.4,'#94a6a3',.16);
+    for(const node of map.nodes) disc('intersection',node.x,node.z,1.4,'#a8b6ae',.16);
     map.places.forEach((place,index)=>{
       places.set(place.id,place);
       const p = buildingPosition(place,index); placement.set(place.id,p);
       const meta = PLACES.find(x=>x.id===place.id);
-      disc('garden-patch',p.x,p.z,2.9,theme==='farm'?'#b6cc8e':'#a9ce9e',.035);
-      disc('soft-contact',p.x+.3,p.z+.35,2.0,'#9cba97',.08,.75);
-      const building=decoration(place.id,[p.x,.12,p.z],1,p.rotation);
-      // The big invisible hitbox owns picking; this lets every visible static
-      // building be merged across the island without losing place identity.
+      box('front-garden',[p.x,.065,p.z],[6,.08,5.6],'#e8e7d4');
+      const building=decoration(place.id,[p.x,.12,p.z],1.24,p.rotation);
+      // A generous hitbox makes both small facade details and roofs tappable.
       for (const mesh of building.getChildMeshes()) mesh.isPickable = false;
       const hit=own(MeshBuilder.CreateBox(`hit-${place.id}`,{width:5.7,height:4.8,depth:5.7},scene));
       hit.position.set(p.x,2,p.z);hit.visibility=0;hit.isPickable=true;hit.metadata={placeId:place.id};
       const sign=disc('place-badge',place.x+1.9,place.z, .42,meta?.color||'#f4c566',.2);
       sign.metadata={placeId:place.id};sign.isPickable=true;
       if(place.id!=='park')decoration('flowers',[p.x-1.1,.12,p.z+(p.rotation?1.7:-1.7)],.9,p.rotation);
+      decoration('planter',[p.x+2.2,.12,p.z-2.1],3);
+      decoration('oak',[p.x-2.4,.12,p.z+1.5],2.15);
     });
     // Small neighbourhood silhouettes on the outer rim keep the playable
     // buildings distinct and the centre open for children's route choices.
-    const rim=mapRadius-2.1;
+    const rim=mapRadius-1.5;
     for(let i=0;i<14;i++){
       const side=i%4,t=(Math.floor(i/4)-1.5)*7;
       const x=side===0?-rim:side===1?rim:t,z=side===2?-rim:side===3?rim:t;
       if([...placement.values()].some(p=>Math.hypot(p.x-x,p.z-z)<4.5))continue;
-      decoration(i%4===0?'house':'tree',[x,.03,z],i%4===0?.8:1+cosmetic()*.15,cosmetic()*6.28);
-      if(i%3===0)decoration('bush',[x+1.7,.03,z+.4],1.1);
+      decoration('poplar',[x,.03,z],1.7+cosmetic()*.25,cosmetic()*6.28);
+      if(i%3===0)decoration('hedge',[x+1.7,.03,z+.4],1.3);
+    }
+    const xs=[...new Set(map.nodes.map(n=>n.x))].sort((a,b)=>a-b);
+    const zs=[...new Set(map.nodes.map(n=>n.z))].sort((a,b)=>a-b);
+    for(let xi=0;xi<xs.length-1;xi++)for(let zi=0;zi<zs.length-1;zi++){
+      const x=(xs[xi]+xs[xi+1])/2,z=(zs[zi]+zs[zi+1])/2;
+      if([...placement.values()].some(p=>Math.hypot(p.x-x,p.z-z)<5))continue;
+      box('residential-garden',[x,.06,z],[5.5,.08,5.3],'#d9dfc3');
+      decoration(['home-a','home-c','home-f'][(xi+zi)%3],[x,.12,z],3.15,Math.PI);
+      decoration('planter',[x+1.7,.12,z-2.1],2.4);
+      decoration('oak',[x-2,.12,z+1.4],1.8);
+    }
+    for(const node of map.nodes){
+      if(!map.edges.some(([a,b])=>{const other=nodes.get(a===node.id?b:b===node.id?a:null);return other&&other.x===node.x&&other.z>node.z;}))continue;
+      for(let k=0;k<5;k++)box('crosswalk',[node.x-1+k*.5,.193,node.z+2.05],[.28,.025,.85],'#f6f2dc');
     }
     for(const place of map.places.filter(p=>p.id==='park'||p.id==='school')){
       const p=placement.get(place.id);decoration('bench',[p.x-2.2,.1,p.z+.5],1,Math.PI/2);
@@ -209,26 +217,26 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
       box('pier',[mapRadius-1,-.1,0],[5,.3,2.5],'#c69565');
       for(let i=0;i<6;i++)box('pier-board',[mapRadius-3+i*.8,.08,0],[.06,.03,2.5],'#efdcb3');
     }
-    batchStaticGround();
     const depot=places.get('depot')||map.places[0];
     position.set(depot?.x||0,.2,depot?.z||0);location=depot?.id||'depot';
     if(vehicle)vehicle.position.copyFrom(position);
     aim.set(0,0,0);camera.setTarget(aim);overviewMode=true;
     fitCamera();
   }
-  function fitCamera() {
+  function fitCamera(dt=0) {
     const aspect=engine.getRenderWidth()/Math.max(1,engine.getRenderHeight());
-    targetHalfHeight = overviewMode ? Math.max(18, mapRadius * .88, mapRadius * 1.18 / aspect) : 15;
+    targetHalfHeight = overviewMode ? Math.max(23.5, mapRadius * 1.24, mapRadius * 1.5 / aspect) : 15.5;
+    currentHalfHeight=dt?currentHalfHeight+(targetHalfHeight-currentHalfHeight)*(1-Math.exp(-dt*3)):targetHalfHeight;
     // Leave room for the compact top and bottom Canvas HUD, without a tiny map.
-    camera.orthoTop=targetHalfHeight;camera.orthoBottom=-targetHalfHeight;
-    camera.orthoLeft=-targetHalfHeight*aspect;camera.orthoRight=targetHalfHeight*aspect;
+    camera.orthoTop=currentHalfHeight;camera.orthoBottom=-currentHalfHeight;
+    camera.orthoLeft=-currentHalfHeight*aspect;camera.orthoRight=currentHalfHeight*aspect;
   }
   function setVehicle(id) {
     if(id===vehicleId&&vehicle)return;
     cargoRoot?.dispose(false,false);cargoRoot=null;cargoKey='';
     vehicleAsset?.dispose();vehicleAsset=null;
     vehicleId=id||'van';
-    vehicleAsset=instantiate(vehicleId,null,[position.x,position.y,position.z],.92);
+    vehicleAsset=instantiate(vehicleId,null,[position.x,position.y,position.z],1.16);
     vehicle=vehicleAsset.wrapper;vehicle.name='player-vehicle';
   }
   function sync(next) {
@@ -278,8 +286,8 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   function effect(kind){if(kind==='rain'||kind==='weather')rainTime=5;else burst(kind==='start'?'dust':kind,position,kind==='reward'?35:12);}
   function update(dt) {
     dt=Math.min(Math.max(Number(dt)||0,0),.1);
-    fitCamera();
     if(paused)return;
+    fitCamera(dt);
     clock+=dt;weatherTime+=dt;
     if(moving&&vehicle){
       let remaining=dt*6.8;
@@ -345,20 +353,20 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   const cancel=()=>{pressed=null;};
   canvas?.addEventListener('pointerdown',trackDown,true);canvas?.addEventListener('pointerup',trackUp,true);canvas?.addEventListener('pointercancel',trackUp,true);
   canvas?.addEventListener('pointercancel',cancel);canvas?.addEventListener('lostpointercapture',cancel);
-  const resizeObserver=engine.onResizeObservable.add(fitCamera);
+  const resizeObserver=engine.onResizeObservable.add(()=>fitCamera());
   return {
     setMap,sync,travel,update,overview,effect,projectPlaces,
     cancelInput(){pressed=null;heldPointers.clear();multiPointerGesture=false;},
     setPaused(value){paused=!!value;pressed=null;},
     setReducedMotion(value){reducedMotion=!!value;if(value){for(const p of particles.particles)p.isVisible=false;particles.setParticles();}},
-    getState(){return {position:{x:position.x,y:position.y,z:position.z},moving,location,vehicleId,meshCount:scene.meshes.length,particleCount:particles.particles.filter(p=>p.isVisible).length,particleLimit:96,weather:rainTime>0?'rain':'clear',camera:{overview:overviewMode,target:{x:aim.x,z:aim.z}},theme:map?.theme};},
+    getState(){return {position:{x:position.x,y:position.y,z:position.z},moving,location,vehicleId,meshCount:scene.meshes.length,orphanMeshCount:scene.meshes.filter(m=>m!==particleMesh&&!m.isDescendantOf(mapRoot)&&!m.isDescendantOf(vehicle)).length,particleCount:particles.particles.filter(p=>p.isVisible).length,particleLimit:96,weather:rainTime>0?'rain':'clear',camera:{overview:overviewMode,target:{x:aim.x,z:aim.z}},theme:map?.theme};},
     dispose(){
       scene.onPointerObservable.remove(observer);engine.onResizeObservable.remove(resizeObserver);
       canvas?.removeEventListener('pointercancel',cancel);canvas?.removeEventListener('lostpointercapture',cancel);
       canvas?.removeEventListener('pointerdown',trackDown,true);canvas?.removeEventListener('pointerup',trackUp,true);canvas?.removeEventListener('pointercancel',trackUp,true);
       for(const instance of mapInstances.splice(0))instance.dispose();mapRoot?.dispose(false,false);
       cargoRoot?.dispose(false,false);vehicleAsset?.dispose();particles.dispose();particleMaterial.dispose();
-      for(const material of materials.values())material.dispose();camera.dispose();ambient.dispose();sun.dispose();
+      for(const material of materials.values())material.dispose();shadows.dispose();camera.dispose();ambient.dispose();sun.dispose();
     },
   };
 }
