@@ -24,3 +24,11 @@ temp/
 *.key
 credentials.json
 secrets/
+
+# Web prototype build and local verification output
+node_modules/
+dist/
+artifacts/
+__pycache__/
+*.pyc
+.venv-voice/

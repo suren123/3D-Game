@@ -1,0 +1,21 @@
+{
+  "出发去小车车库！": "go-garage.mp3",
+  "出发去面包店！": "go-bakery.mp3",
+  "出发去小花房！": "go-garden.mp3",
+  "出发去消防站！": "go-station.mp3",
+  "出发去阳光公园！": "go-park.mp3",
+  "出发去泡泡洗车屋！": "go-wash.mp3",
+  "面包烤好啦，轻轻点一下装上车。": "arrive-bread-0.mp3",
+  "装好啦！一起送给公园的朋友吧。": "reward-bread-0.mp3",
+  "朋友们在等你，来分享面包吧！": "arrive-bread-1.mp3",
+  "谢谢你！大家都吃到了香香的面包。": "reward-bread-1.mp3",
+  "小花准备好啦，轻轻点一下装上车。": "arrive-flowers-0.mp3",
+  "小花坐好啦！去消防站看看吧。": "reward-flowers-0.mp3",
+  "这里正好可以种花，一起来吧！": "arrive-flowers-1.mp3",
+  "谢谢你！小花让消防站更漂亮啦。": "reward-flowers-1.mp3",
+  "泡泡准备好啦，点一下开始洗车。": "arrive-wash-0.mp3",
+  "泡泡洗呀洗，小车变得亮晶晶！": "reward-wash-0.mp3",
+  "到家啦，把亮晶晶的小车停好吧。": "arrive-wash-1.mp3",
+  "今天辛苦啦！你真会照顾小车。": "reward-wash-1.mp3",
+  "点一点目的地，小车自己开。到站后，点大按钮帮个忙吧！": "help.mp3"
+}

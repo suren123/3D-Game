@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f8f7ed" />
+    <meta name="description" content="开着小车逛小镇，送面包、种小花、洗洗车。专为小朋友设计的轻松汽车游戏。" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='3' y='3' width='58' height='58' rx='18' fill='%23ffcb69'/%3E%3Cpath d='M14 31h36v16H14zM22 20h19l6 13H17z' fill='%23ee735a'/%3E%3Ccircle cx='22' cy='47' r='6' fill='%23294e48'/%3E%3Ccircle cx='43' cy='47' r='6' fill='%23294e48'/%3E%3C/svg%3E" />
+    <title>小车忙忙镇 · 今天也要快乐出发</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="小车忙忙镇首页"><span class="brand-icon" id="brand-icon"></span><span><strong>小车忙忙镇</strong><small>LITTLE TOWN, BIG ADVENTURES</small></span></a>
+        <nav class="main-nav" aria-label="游戏页面">
+          <button id="town-tab" class="nav-button selected" aria-pressed="true"><span data-icon="town"></span>逛小镇</button>
+          <button id="stickers-tab" class="nav-button" aria-pressed="false"><span data-icon="sticker"></span>我的贴纸<span class="badge" id="sticker-count">0</span></button>
+        </nav>
+        <div class="toolbar">
+          <button id="sound-button" class="round-button" aria-label="关闭声音" aria-pressed="true"></button>
+          <button id="help-button" class="round-button" aria-label="怎么玩"><span data-icon="help"></span></button>
+        </div>
+      </header>
+
+      <main class="play-layout">
+        <aside class="mission-panel" aria-label="当前任务">
+          <div class="eyebrow"><span class="tiny-sun">✦</span> 今天的小小冒险</div>
+          <div class="mission-art" id="mission-art" aria-hidden="true"></div>
+          <div class="mission-title-row"><h1 id="mission-title">送面包</h1><span class="task-number" id="task-number">01 / 03</span></div>
+          <p class="mission-subtitle" id="mission-subtitle">给公园的朋友送去香香的面包</p>
+          <ol class="steps" id="mission-steps"></ol>
+          <div class="gentle-note"><span data-icon="heart"></span><span>慢慢来，每一步都很棒！</span></div>
+          <button id="choose-button" class="choose-button"><span data-icon="grid"></span>换个小任务<span data-icon="chevron"></span></button>
+        </aside>
+
+        <section class="world-panel" aria-label="可以点击地点的玩具小镇">
+          <div class="world-heading"><span class="weather-icon" data-icon="sun"></span><span>阳光刚刚好<small>小镇的朋友在等你</small></span></div>
+          <div class="map-label">SUNNY SIDE TOWN<span>一座充满小美好的小镇</span></div>
+          <div id="town" class="town-canvas" aria-label="斜俯视小镇场景"></div>
+          <div id="location-markers" class="location-markers"></div>
+          <div id="scene-fallback" class="scene-fallback" hidden><span data-icon="car"></span><h2>小镇画面还没准备好</h2><p>请用支持 WebGL 2 的浏览器打开，或刷新试试。</p><button id="retry-button" class="primary-button">再试一次</button></div>
+          <div class="world-caption"><span class="caption-dot"></span>点一点目的地，小车自己开</div>
+          <button id="pause-button" class="pause-button" aria-label="暂停游戏" aria-pressed="false"><span data-icon="pause"></span><span id="pause-label">歇一会</span></button>
+          <div class="pause-overlay" id="pause-overlay" hidden><span data-icon="car"></span><h2>小车休息一下</h2><button id="resume-button" class="primary-button">继续出发<span data-icon="arrow"></span></button></div>
+        </section>
+      </main>
+
+      <footer class="drive-bar">
+        <div class="buddy" id="buddy" aria-hidden="true"></div>
+        <div class="drive-message"><span class="message-label" id="message-label">小司机，准备好了吗？</span><p id="instruction" role="status" aria-live="polite">点一下，去面包店拿面包吧！</p></div>
+        <button id="drive-button" class="primary-button drive-button"><span data-icon="car"></span><span id="drive-label">出发去面包店</span><span data-icon="arrow"></span></button>
+      </footer>
+      <div class="orientation-hint"><span>↻</span> 横过来，小镇更好玩哦！</div>
+      <div id="confetti" class="confetti" aria-hidden="true"></div>
+      <dialog id="game-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><button id="close-dialog" class="round-button close-button" aria-label="关闭窗口"><span data-icon="close"></span></button><div id="dialog-content"></div></dialog>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
