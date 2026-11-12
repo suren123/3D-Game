@@ -37,3 +37,13 @@ GitHub Actions运行43212030141成功，https://suren123.github.io/3D-Game/ 已�
 - 视觉样板加入Kenney Suburban/Nature资源、保留PBR、柔和阴影、路口斑马线、街区住宅、紧凑标牌与稍大的车辆。先截图确认视觉方向，尚未合入main；性能优化按用户要求后置。
 
 视觉样板验证完成：21项单元测试、资源检查和构建通过；实际浏览器断网配送与10次换图无残留网格/新请求，三组地图建筑/标签输入回归全部通过。对比截图与范围见 `docs/visual-preview.md`。样板保留在独立分支等待画面反馈，main保持已发布点击修复。
+
+## 最新发布指令与后续需求
+
+用户说明自己比较的是线上旧V2，因此要求立即把已验证的2147b9a视觉样板合入main并发布Pages，先在线试玩。本次发布不代表以下三项已经实现：
+
+1. iPad主屏幕Web App：补manifest standalone、Apple兼容meta及图标；普通Safari/微信的工具栏不能由网页直接去除。Safari不可靠支持方向锁；推荐竖屏提示横置并暂停，横屏恢复，真机验收。此轮无需引入Service Worker。
+2. 忠实恢复V1美术：以v1-stable-before-canvas及src/town.js为唯一基准，保留原相机、sRGB/ACES、色板、圆角底板、模型与植被比例。推荐恢复Three.js世界，保留V2随机任务规则、音频与预加载；不能将“45度”口语机械解释成数学45度。
+3. 分离操作区与地图：建议左侧约75%为独立世界视口，右侧约25%为固定Canvas操作区；阶段性显示任务/车辆/装货/交货，合并重复帮助入口，地图不再覆盖大卡片。继续单一可见Canvas，可用Three正交UI层+离屏CanvasTexture。
+
+本轮只读研究：ipad_install_research、v1_visual_audit，均请求GPT-6.1 Sol high，无文件写入；主Agent负责发布。用户已授权后续做好直接发布，无需再次询问发布权限。上述三项尚待实施，当前先交付可试玩样板。
