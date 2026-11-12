@@ -1,45 +1,30 @@
-# 资源来源与许可证
+# V2 资源与许可证
 
-## 已实际采用
+核验日期：2026-11-12。当前运行资源的唯一清单是 `src/v2/resource-manifest.js`；`npm run check:assets` 核对文件、GLB 外部纹理、语音文案和许可证。V1 资源作为历史参考保留，不属于当前运行清单。
 
-| 资源 | 官方来源 | 用途与位置 | 许可证 |
-| --- | --- | --- | --- |
-| Car Kit 3.1 | https://kenney.nl/assets/car-kit | `public/models/kenney-car/taxi.glb` 与 `Textures/colormap.png`；黄色任务小车 | CC0 1.0，原许可证随模型保存 |
-| Interface Sounds | https://kenney.nl/assets/interface-sounds | `public/audio/kenney-interface/` 的点击、到站和完成短音效 | CC0 1.0，原许可证随声音保存 |
+## 实际使用
 
-核验日期：2026-11-12。由 Kenney 官方下载链接取得，未使用第三方镜像。CC0 允许个人、教育及商业使用，作者不要求强制署名；本项目仍保留来源和原文许可证。CC0 文本：https://creativecommons.org/publicdomain/zero/1.0/
+| 资源 | 来源与用途 | 许可 |
+| --- | --- | --- |
+| Car Kit 3.1 | https://kenney.nl/assets/car-kit ；van、truck、delivery、truck-flat，分别作为小货车、大卡车、冷藏车和维修车基础车型，共享原始 `Textures/colormap.png` | CC0 1.0，保留原License.txt |
+| Interface Sounds | https://kenney.nl/assets/interface-sounds ；click_001、pluck_001、confirmation_001 三个短音效 | CC0 1.0，保留原License.txt |
+| 14 个原创 GLB | `public/models/town-v2/`：7地点、房子、树、灌木、长椅、花丛、巴士、洒水车，由 `scripts/generate_models.mjs` 生成 | 项目原创，无第三方纹理 |
+| GUI 图形 | `src/v2/ui.js` 的矢量物品、地点、车辆、按钮图标 | 项目原创，无图片或远程字体 |
+| 中文语音 | edge-tts 7.3.1 根据项目公开文案生成的46段MP3 | 非Kenney资源，不标为CC0；生成工具不随网页分发 |
+| Babylon.js 9.35.0 / GUI / GLTF loader | 游戏运行引擎与GUI，精确锁定版本 | Apache-2.0，原文随 `public/licenses/` 分发 |
 
-### 模型处理
+Kenney 文件来自官方原始下载，无第三方镜像。CC0 允许个人、教育及商业使用；仍保留来源和许可。Car Kit 原始 GLB 的外部贴图路径大小写保持不变，不需要 Draco 或额外在线解码器。
 
-- 原始 taxi.glb 175,608 字节，外部纹理 12,371 字节，总计约 184 KiB。
-- 保持 `Textures/colormap.png` 相对路径和大小写；GLB 并非完全自包含文件。
-- Y 向上、+Z 车头，缩放约 0.7；独立车轮按行驶动画滚动。原程序几何车作为加载失败回退。
-- 无 Draco 或额外远程解码器依赖。模型和纹理保持原文件，不重新压缩。
+音效由原OGG转换为WAV，PCM16、单声道、22050Hz，音量为原始0.5，合计21690字节。原创模型为离线导出的GLB2.0，嵌入二进制和颜色，无外部贴图；世界实例共享材料，静态同色几何合批。
 
-### 音效处理
+## 中文语音与预加载
 
-从包内 `click_001.ogg`、`pluck_001.ogg`、`confirmation_001.ogg` 转换为同名 WAV：PCM 16-bit、单声道、22,050 Hz，幅度降至原始 0.5，三个文件总计 21,690 字节。采用 WAV 避免较旧 iPad Safari 对 OGG 支持差异。
+工具 https://github.com/rany2/edge-tts ，音色 `zh-CN-XiaoxiaoNeural`，rate `-10%`、volume `-10%`。`src/v2/dialogue.js` 是有限文案源，生成器 `scripts/generate_voice_v2.py` 复用严格TLS与ffprobe校验流程，`public/audio/voice-v2/manifest.json` 记录文案与文件对应。任务通过已生成的物品、数量、地点、连接词组合，不在游玩期间联网合成或使用浏览器在线语音后备。
 
-通过真实用户手势解锁 Web Audio；保留静音；短音效不叠加播放。声音文件失败时使用低音量合成提示。最终听感需真实扬声器/设备确认，未把文件可解码等同于儿童听感验收。
+18个模型、49个声音、1个共享纹理共68个运行资源文件，当前原始资源总计约2.08MB（准确值由检查脚本给出），另有首屏打包的引擎JS和CSS。所有语音和音效在开始前解码成AudioBuffer；第一次点击解锁音频设备。声音不可解码或资源缺失会在Canvas提示重试，不带着缺失资源开局。
 
-## 已参考、未引入文件
+## 参考但未引入
 
-- [City Kit (Suburban)](https://kenney.nl/assets/city-kit-suburban)：住宅、屋顶和栅栏的玩具比例可用于后续住宅区扩展。
-- [City Kit (Roads)](https://kenney.nl/assets/city-kit-roads)：道路、路口与桥适合未来扩地图；当前规则网格与驾驶逻辑已经对齐。
-- [Nature Kit](https://kenney.nl/assets/nature-kit)：未来可选少量树木、花丛，不整包加入。
-- [UI Pack](https://kenney.nl/assets/ui-pack)：当前自绘暖色 SVG 和大按钮更适合幼儿，不替换成通用控件。
-- [UI Audio](https://kenney.nl/assets/ui-audio)：短反馈音备选；本轮统一采用 Interface Sounds。
+Kenney City Kit (Suburban)、City Kit (Roads)、Nature Kit、UI Pack、UI Audio 已参考风格或作为候选；本轮没有导入它们的资源文件。没有调用 image2 或其他生图工具。V1黄色出租车、旧语音与Three.js源码保留在仓库历史参考，V2入口不会请求它们。
 
-上述官方页面均标注 CC0；未采用的城市/自然包本轮没有完整解包验证，不对其文件格式作已核实声明。后续实际引入时重新检查具体文件和许可证。
-
-## 原型自制内容与依赖
-
-建筑、道路、植物、任务货物与 UI 图形为本项目程序生成或 SVG 绘制，不依赖远程图片和字体。Three.js、Vite 为 MIT；依赖版本由锁文件固定。Three.js 的版权和 MIT 原文已放在 `public/licenses/three-LICENSE.txt` 并随 dist 分发；Vite 是构建工具，不作为游戏运行时代码分发。
-
-## 中文提示语（本地生成）
-
-用户指定工具：[edge-tts](https://github.com/rany2/edge-tts)，已安装版本 7.3.1。采用 `zh-CN-XiaoxiaoNeural`，rate -10%、volume -10%，根据本项目原创公开文案生成，不是 Kenney 音效，也不标作 Kenney CC0 资源。
-
-`public/audio/voice/manifest.json` 将实际文案映射到 19 个本地 MP3：6 句出发、12 句到站/动作奖励、1 句玩法帮助。合计 408,816 字节，总时长 68.136 秒，单句 2.160–6.624 秒。全部经 ffprobe 与 ffmpeg 解码验证；没有据此宣称真机扬声器听感已验证。
-
-脚本 `scripts/generate_voice.py` 可复现，生成阶段调用在线服务；游戏内只播放本地文件。生成工具的 Python 环境不随网页分发。重新生成后的体积和时长以实际检查为准。
+Three.js 0.180.0及其MIT许可仍随旧版参考保留；Vite为MIT构建工具。真实扬声器听感、目标设备显示效果需用户试玩，不把可解码与云端截图等同于真机验收。

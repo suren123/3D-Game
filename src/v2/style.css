@@ -1,0 +1,7 @@
+:root {font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; color-scheme:light; background:#cde4db;}
+* {box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; user-select:none; -webkit-user-select:none;}
+html,body {width:100%;height:100%;margin:0;overflow:hidden;overscroll-behavior:none;touch-action:none;}
+#game {display:block;width:100%;height:100%;outline:none;touch-action:none;}
+#graphics-error {position:fixed;inset:0;display:grid;align-content:center;justify-items:center;background:#fff8e9;padding:40px;text-align:center;font-size:26px;color:#264d48;}
+#graphics-error[hidden] {display:none;}
+#graphics-error button {font:inherit;border:0;border-radius:24px;background:#ffcc72;color:#264d48;padding:22px 35px;margin:24px;}
