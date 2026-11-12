@@ -29,10 +29,11 @@ async def click(p,key):
    await click(p,'next-vehicles')
    await p.wait_for_function('!!window.__townTest.snapshot().bounds["next-vehicles"]')
  x,y=await center(p,key);await p.touchscreen.tap(x,y);await p.wait_for_timeout(120)
-async def phase(p,value):await p.wait_for_function('(v)=>window.__townTest.snapshot().state.phase===v',arg=value,timeout=60000)
+# Long routes need extra wall time on the cloud's software renderer.
+async def phase(p,value):await p.wait_for_function('(v)=>window.__townTest.snapshot().state.phase===v',arg=value,timeout=180000)
 async def travel(p,place):
  await click(p,'destinations');await click(p,'destination-'+place)
- await p.wait_for_function('window.__townTest.snapshot().state.phase!=="moving"',timeout=60000)
+ await p.wait_for_function('window.__townTest.snapshot().state.phase!=="moving"',timeout=180000)
  assert (await state(p))['location']==place
 async def prepare(p):
  await click(p,'ack');s=await state(p)
@@ -98,10 +99,10 @@ async def main():
   try:
    await p.goto(URL+'?test=1&seed=11',wait_until='domcontentloaded')
    await p.wait_for_function('window.__townTest?.snapshot().ready',timeout=120000)
-   initial=await snap(p);assert initial['audio']['count']==49 and initial['resources']['ready']
+   initial=await snap(p);assert initial['audio']['count']==len(initial['manifest']['audio']) and initial['resources']['ready']
    assert await p.locator('canvas:visible').count()==1
    assert await p.locator('button:visible,input:visible,a:visible').count()==0
-   ok('single visible canvas; all 49 audio buffers decoded before start')
+   ok('single visible canvas; all manifest audio buffers decoded before start')
    await p.screenshot(path=str(OUT/'01-ready.png'))
    await ctx.set_offline(True);after_ready=len(requests)
    await click(p,'start');await p.screenshot(path=str(OUT/'02-brief.png'))
@@ -129,6 +130,7 @@ async def main():
     await click(p,'settings');await click(p,'difficulty-challenge');await click(p,'new-session');await phase(p,'brief')
     s=await snap(p);themes.add(s['state']['map']['theme']);mesh_counts.append(s['render']['meshes'])
     assert s['world']['orphanMeshCount']==0,s['world']
+    assert all(p['rotation']==0 for p in s['world']['landmarks'])
    assert len(requests)==after_ready,requests[after_ready:]
    report['mapCycles']={'themes':list(themes),'meshes':mesh_counts};ok('ten offline random maps: no network requests, bounded mesh counts')
    # Read-only test snapshots may expose answers, but product has no visible DOM controls.

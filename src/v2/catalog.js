@@ -26,13 +26,15 @@ export const VEHICLES = freeze([
 ]);
 
 export const PLACES = freeze([
-  { id: 'depot', name: '小镇仓库', icon: '📦', color: '#efbf6b' },
-  { id: 'park', name: '阳光公园', icon: '🌳', color: '#87c89b' },
-  { id: 'school', name: '彩虹学校', icon: '🏫', color: '#e7b67a' },
-  { id: 'hospital', name: '爱心医院', icon: '🏥', color: '#e7a3a0' },
-  { id: 'farm', name: '开心农场', icon: '🌻', color: '#b5cd80' },
-  { id: 'cafe', name: '熊熊餐厅', icon: '☕', color: '#d8a188' },
-  { id: 'garage', name: '汽车工坊', icon: '🔧', color: '#97b6d9' },
+  { id: 'depot', name: '仓库', icon: '📦', color: '#efbf6b' },
+  { id: 'park', name: '公园', icon: '🌳', color: '#87c89b' },
+  { id: 'school', name: '学校', icon: '🏫', color: '#e7b67a' },
+  { id: 'hospital', name: '医院', icon: '🏥', color: '#e7a3a0' },
+  { id: 'farm', name: '农场', icon: '🌻', color: '#b5cd80' },
+  { id: 'cafe', name: '餐厅', icon: '☕', color: '#d8a188' },
+  { id: 'garage', name: '车库', icon: '🔧', color: '#97b6d9' },
+  { id: 'shop', name: '商店', icon: '🛒', color: '#e9bc82' },
+  { id: 'camp', name: '营地', icon: '⛺', color: '#94bd8a' },
 ]);
 
 export const THEMES = freeze([
@@ -52,13 +54,15 @@ export const TEMPLATES = freeze([
   { id: 'garden', name: '花园帮手', title: '让花园更漂亮', goods: ['flowers', 'seeds', 'water'], places: ['farm', 'park'] },
   { id: 'school', name: '开学礼物', title: '送去快乐学习包', goods: ['book', 'ball', 'parcel'], places: ['school', 'park'] },
   { id: 'care', name: '爱心补给', title: '给邻居送一份关心', goods: ['milk', 'flowers', 'bread', 'apple'], places: ['hospital', 'cafe'] },
-  { id: 'repair', name: '工坊帮忙', title: '一起照顾小汽车', goods: ['tools', 'parcel', 'book'], places: ['garage', 'farm'] },
+  { id: 'repair', name: '车库帮忙', title: '一起照顾小汽车', goods: ['tools', 'parcel', 'book'], places: ['garage', 'farm'] },
   { id: 'shuttle', name: '快乐出游', title: '和朋友一起出发', goods: ['passenger', 'ball', 'book'], places: ['school', 'park'] },
+  { id: 'restock', name: '商店补货', title: '帮商店和餐厅补满货架', goods: ['bread', 'apple', 'milk', 'parcel'], places: ['shop', 'cafe'] },
+  { id: 'camping', name: '营地补给', title: '给营地和公园送去物资', goods: ['water', 'bread', 'parcel', 'seeds'], places: ['camp', 'park'] },
 ]);
 
 export const EVENTS = freeze([
   { id: 'roadworks', name: '前面在修路', title: '换条路也能到！', message: '一小段路正在修。选一条办法，继续帮忙。', options: [{ id: 'detour', label: '看看绕行路线' }, { id: 'reopen', label: '请工人开放便道' }] },
   { id: 'capacity', name: '货箱小变化', title: '给物品找好位置', message: '车里先留一个安全位置。可以加小拖车一次送，也可以把其余物品暂存仓库，分次来取。', options: [{ id: 'trailer', label: '装上小拖车' }, { id: 'two-trips', label: '暂存仓库，分次来取' }] },
-  { id: 'shortage', name: '仓库换货架', title: '补货也有办法', message: '一个货架正在补货。可以找备用箱，也可以去工坊取货。', options: [{ id: 'reserve', label: '打开备用箱' }, { id: 'pickup', label: '去工坊补货' }] },
+  { id: 'shortage', name: '仓库换货架', title: '补货也有办法', message: '一个货架正在补货。可以找备用箱，也可以去车库取货。', options: [{ id: 'reserve', label: '打开备用箱' }, { id: 'pickup', label: '去车库补货' }] },
   { id: 'repair', name: '轮胎需要照顾', title: '小车也要休息', message: '轮胎有些软。点三下给轮胎打气，也可以请朋友一次修好。', options: [{ id: 'pump', label: '给轮胎打气（0/3）' }, { id: 'helper', label: '请朋友来修理' }] },
 ]);

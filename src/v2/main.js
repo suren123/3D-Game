@@ -113,7 +113,7 @@ async function boot(){
     audio=createAudio();audio.setEnabled(settings.sound);
     ui=createUI(scene,{onCommand:command,onSpeak:()=>{audio.unlock().then(speak).catch(()=>{});},
       onSound:value=>{settings.sound=value;audio.setEnabled(value);persist();ui.setSettings(settings);},
-      onOverview:()=>world?.overview(),
+      onModelPreview:(id,zoom)=>world?.setModelPreview(id,zoom),
       onReducedMotion:value=>{settings.reducedMotion=value;world?.setReducedMotion?.(value);ui.setSettings(settings);persist();},
       onNewSession:newSession});
     ui.setSettings(settings);
@@ -129,6 +129,7 @@ async function boot(){
     });
     ui.loading({progress:0,text:'正在把整个小镇装进口袋…'});
     resources=await preloadResources(scene,audio,progress=>ui.loading(progress));
+    ui.setModelIcons(resources.icons);
     world=createWorld(scene,{assets:resources.assets,
       onPlaceTap:placeId=>command({type:'TRAVEL',placeId}),
       onArrival:()=>{if(started)game.dispatch({type:'ARRIVE'});},reducedMotion:settings.reducedMotion});
@@ -173,7 +174,7 @@ window.addEventListener('pageshow',fitViewport);
 document.querySelector('#graphics-error button').addEventListener('click',()=>location.reload());
 if(testMode)Object.defineProperty(window,'__townTest',{value:Object.freeze({
   snapshot:()=>({state:game.getState(),ready,started,resources:resources?.stats,audio:audio?.stats(),world:world?.getState(),
-    bounds:ui?.getBounds(),places:world?.projectPlaces(),layout:ui?.getLayout?.(),orientationBlocked,
+    bounds:ui?.getBounds(),places:world?.projectPlaces(),layout:ui?.getLayout?.(),modelView:ui?.getModelView(),orientationBlocked,
     standalone:window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true,
     settings:{...settings},frames:frameCount,manifest:RESOURCE_MANIFEST,
     vehicleMaterials:scene?.meshes.filter(m=>m.name.startsWith(`${game.getState().vehicleId}:`)&&m.material).map(m=>({name:m.name,lights:m._lightSources?.length,

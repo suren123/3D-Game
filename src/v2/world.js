@@ -16,7 +16,9 @@ import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
 // Scene.pick is a warning-only stub until this side-effect registers ray picking.
 // Keep it explicit when importing individual engine modules.
 import '@babylonjs/core/Culling/ray.js';
-import { GOODS, PLACES, VEHICLES } from './catalog.js';
+import { GOODS, PLACES } from './catalog.js';
+import { buildRoadPath, createRoadMotion, advanceRoadMotion } from './motion.js';
+import { createModelPreview } from './model-preview.js';
 
 // The world only presents rules state. Models arrive fully parsed in the asset
 // registry; neither this module nor a later map change opens a network request.
@@ -56,10 +58,16 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   }
   let mapRoot = null, vehicle = null, vehicleAsset = null, cargoRoot = null, roadworksRoot = null;
   let map = null, state = null, vehicleId = '', cargoKey = '', blockedKey = '', location = 'depot';
-  let paused = false, moving = false, route = [], routeIndex = 0, destination = null;
+  let paused = false, moving = false, motion = null, destination = null;
+  let departureTurn = null;
+  let cargoAnimation = null, cargoFeedback = 0;
   let clock = 0, weatherTime = 0, rainTime = 0, travelDust = 0, overviewMode = true;
   let mapRadius = 20, targetHalfHeight = 23, currentHalfHeight = 23;
   let worldRect = null;
+  let framing = { halfWidth: 23, halfHeight: 23 };
+  const mapFocus = new Vector3(0, .8, 0);
+  const modelPreview=createModelPreview(scene,{assets});
+  let previewId=null,previewZoom=1;
   const aim = Vector3.Zero();
   const position = new Vector3(0, .14, 0);
   const mapInstances = [], places = new Map(), placement = new Map();
@@ -96,7 +104,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     const center = [(a.x + b.x) / 2, .075, (a.z + b.z) / 2];
     const border = box('road-shoulder', center, [3.65, .10, length + .9], '#ebe4d2');
     border.rotation.y = Math.atan2(dx, dz);
-    const lane = box('road', [center[0], .14, center[2]], [2.8, .07, length + .25], '#a8b6ae');
+    const lane = box('road', [center[0], .14, center[2]], [3, .07, length + .25], '#a8b6ae');
     lane.rotation.y = border.rotation.y;
     for (let d = 1.8; d < length - .7; d += 2.5) {
       const dash = box('road-dash', [a.x + dx * d / length, .185, a.z + dz * d / length], [.10, .025, .8], '#f6edcd');
@@ -107,14 +115,19 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     // Pick an unoccupied diagonal quadrant at the road node. Roads only occupy
     // the cardinal directions, so entrances remain clearly beside the road.
     const dirs = [[-1,-1], [1,-1], [-1,1], [1,1]];
+    const spacing=axis=>{const values=[...new Set(map.nodes.map(n=>n[axis]))].sort((a,b)=>a-b);return values.length>1?Math.min(...values.slice(1).map((v,i)=>v-values[i]))/2:4;};
+    const offsetX=spacing('x'),offsetZ=spacing('z');
     const order = dirs.map(([x,z]) => ({x,z,score: x * place.x + z * place.z + (z-x)*3 + cosmetic() * 2})).sort((a,b)=>b.score-a.score);
     let best = null;
     for (const dir of order) {
-      const x = place.x + dir.x * 3.5, z = place.z + dir.z * 3.5;
+      const x = place.x + dir.x * offsetX, z = place.z + dir.z * offsetZ;
       const space = [...placement.values()].every(p => Math.hypot(p.x-x,p.z-z) > 4.8);
-      if (space) { best = { x, z, rotation: dir.z > 0 ? 0 : Math.PI }; break; }
+      // Authored landmark facades face -Z, toward the fixed (+X,-Z) camera.
+      // Placement may change by seed; recognisable doors/signs must never
+      // turn away from the child just to face a different street quadrant.
+      if (space) { best = { x, z, rotation: 0 }; break; }
     }
-    return best || { x: place.x + (index % 2 ? -3.5 : 3.5), z: place.z + 3.5, rotation: 0 };
+    return best || { x: place.x + (index % 2 ? -offsetX : offsetX), z: place.z + offsetZ, rotation: 0 };
   }
   const particleShape = MeshBuilder.CreateBox('particle-shape', { size: 1 }, scene);
   const particles = new SolidParticleSystem('town-particles', scene, { updatable: true });
@@ -146,7 +159,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   }
 
   function setMap(nextMap) {
-    moving = false; route = []; routeIndex = 0; destination = null;
+    moving = false; motion = null; destination = null; departureTurn=null; clearCargoAnimation();
     for (const instance of mapInstances.splice(0)) instance.dispose();
     mapRoot?.dispose(false, false); mapRoot = new TransformNode('map-root', scene);
     shadows.getShadowMap().renderList=[];
@@ -167,7 +180,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     box('grass-island', [0,-.20,0], [mapRadius*2,.45,mapRadius*2], land);
     const nodes = new Map(map.nodes.map(n=>[n.id,n]));
     for(const edge of map.edges){const a=nodes.get(edge[0]),b=nodes.get(edge[1]);if(a&&b)road(a,b);}
-    for(const node of map.nodes) disc('intersection',node.x,node.z,1.4,'#a8b6ae',.16);
+    for(const node of map.nodes) disc('intersection',node.x,node.z,2.25,'#a8b6ae',.16);
     map.places.forEach((place,index)=>{
       places.set(place.id,place);
       const p = buildingPosition(place,index); placement.set(place.id,p);
@@ -221,14 +234,40 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     const depot=places.get('depot')||map.places[0];
     position.set(depot?.x||0,.2,depot?.z||0);location=depot?.id||'depot';
     if(vehicle)vehicle.position.copyFrom(position);
-    aim.set(0,0,0);camera.setTarget(aim);overviewMode=true;
+    aim.copyFrom(mapFocus);camera.beta=.92;camera.setTarget(aim);overviewMode=true;
+    // Fit the rendered island and building bounds in camera space. The old
+    // radius multiplier left large empty corners, especially beside the sidebar.
+    let left=Infinity,right=-Infinity,bottom=Infinity,top=-Infinity;
+    const view=camera.getViewMatrix(true);
+    for(const mesh of mapRoot.getChildMeshes()){
+      if(mesh.name==='table'||!mesh.isVisible||mesh.visibility===0)continue;
+      mesh.computeWorldMatrix(true);
+      for(const corner of mesh.getBoundingInfo().boundingBox.vectorsWorld){
+        const p=Vector3.TransformCoordinates(corner,view);
+        left=Math.min(left,p.x);right=Math.max(right,p.x);bottom=Math.min(bottom,p.y);top=Math.max(top,p.y);
+      }
+    }
+    framing={halfWidth:Math.max(Math.abs(left),Math.abs(right))+1.1,halfHeight:Math.max(Math.abs(bottom),Math.abs(top))+1.1};
+    mapRoot.setEnabled(!previewId);
     fitCamera();
   }
   function fitCamera(dt=0) {
     const bounds=canvas.getBoundingClientRect();
     const area=worldRect||{x:0,y:0,width:bounds.width,height:bounds.height};
     const aspect=area.width/Math.max(1,area.height);
-    targetHalfHeight = overviewMode ? Math.max(23.5, mapRadius * 1.24, mapRadius * 1.5 / aspect) : 15.5;
+    if(previewId){
+      const bounds=modelPreview.getBounds();
+      if(bounds){
+        camera.beta=Math.PI/4;
+        camera.setTarget(new Vector3(bounds.center.x,bounds.center.y,bounds.center.z));
+        const view=camera.getViewMatrix(true);let halfWidth=0,halfHeight=0;
+        for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z]){
+          const p=Vector3.TransformCoordinates(new Vector3(x,y,z),view);
+          halfWidth=Math.max(halfWidth,Math.abs(p.x));halfHeight=Math.max(halfHeight,Math.abs(p.y));
+        }
+        targetHalfHeight=Math.max(halfHeight,halfWidth/aspect)*1.15/previewZoom;
+      }
+    }else targetHalfHeight = Math.max(framing.halfHeight, framing.halfWidth / aspect);
     currentHalfHeight=dt?currentHalfHeight+(targetHalfHeight-currentHalfHeight)*(1-Math.exp(-dt*3)):targetHalfHeight;
     // Off-centre projection fits the town into its own rectangle. Keeping the
     // camera's full viewport lets the fullscreen Canvas GUI render normally.
@@ -246,11 +285,76 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   }
   function setVehicle(id) {
     if(id===vehicleId&&vehicle)return;
-    cargoRoot?.dispose(false,false);cargoRoot=null;cargoKey='';
+    clearCargoAnimation();cargoKey='';
     vehicleAsset?.dispose();vehicleAsset=null;
     vehicleId=id||'van';
     vehicleAsset=instantiate(vehicleId,null,[position.x,position.y,position.z],1.16);
     vehicle=vehicleAsset.wrapper;vehicle.name='player-vehicle';
+    vehicle.setEnabled(!previewId);
+  }
+  function setModelPreview(id=null,zoom=1){
+    const nextZoom=Math.max(.6,Math.min(2.5,Number(zoom)||1));
+    if(!id&&!previewId)return modelPreview.getState();
+    if(id===previewId&&nextZoom===previewZoom)return modelPreview.getState();
+    pressed=null;
+    if(id){
+      if(id!==previewId)modelPreview.show(id);
+      previewId=id;previewZoom=nextZoom;
+      mapRoot?.setEnabled(false);vehicle?.setEnabled(false);particleMesh.setEnabled(false);
+    }else{
+      modelPreview.hide();previewId=null;previewZoom=1;
+      mapRoot?.setEnabled(true);vehicle?.setEnabled(true);particleMesh.setEnabled(true);
+      camera.beta=.92;aim.copyFrom(mapFocus);camera.setTarget(aim);
+    }
+    fitCamera();return modelPreview.getState();
+  }
+  // Cargo is an action cue, never a permanent roof stack. Every cue uses a
+  // bounded group which is disposed on completion, map change or vehicle swap.
+  const cargoAnchors = {
+    van: {x:0,y:.72,z:-1.08,ground:{x:0,y:.22,z:-2.0}},
+    truck: {x:0,y:.95,z:-1.12,ground:{x:0,y:.22,z:-2.1}},
+    fridge: {x:0,y:.85,z:-1.12,ground:{x:0,y:.22,z:-2.05}},
+    tanker: {x:.8,y:.7,z:-.35,ground:{x:1.8,y:.22,z:-.35}},
+    repair: {x:0,y:.75,z:-.85,ground:{x:0,y:.22,z:-1.9}},
+    bus: {x:.72,y:.66,z:.55,ground:{x:1.7,y:.22,z:.55}},
+  };
+  function clearCargoAnimation(){
+    cargoRoot?.dispose(false,false);cargoRoot=null;cargoAnimation=null;cargoFeedback=0;
+    if(vehicle){vehicle.rotation.x=0;vehicle.rotation.z=0;}
+  }
+  function animateCargo(before,after){
+    const old=new Map((before||[]).map(item=>[item.goodId,item.quantity]));
+    const next=new Map((after||[]).map(item=>[item.goodId,item.quantity]));
+    const changes=[];
+    for(const id of new Set([...old.keys(),...next.keys()])){
+      const delta=(next.get(id)||0)-(old.get(id)||0);
+      for(let i=0;i<Math.min(Math.abs(delta),4)&&changes.length<6;i++)changes.push({id,loading:delta>0});
+    }
+    if(!changes.length||!vehicle)return;
+    clearCargoAnimation();
+    cargoRoot=new TransformNode('cargo-action',scene);cargoRoot.parent=vehicle;
+    const anchor=cargoAnchors[vehicleId]||cargoAnchors.van;
+    const items=changes.map((change,i)=>{
+      const good=GOODS.find(g=>g.id===change.id);
+      const mesh=box('cargo-action-package',[0,0,0],[.42,.34,.4],good?.color||'#e7b76b',cargoRoot);
+      return {...change,mesh,delay:i*.075};
+    });
+    cargoAnimation={items,anchor,time:0,duration:reducedMotion ? .32 : .72};
+    updateCargoAnimation(0);
+  }
+  function updateCargoAnimation(dt){
+    if(!cargoAnimation)return;
+    const cue=cargoAnimation;cue.time+=dt;
+    for(const item of cue.items){
+      const t=Math.max(0,Math.min(1,(cue.time-item.delay)/cue.duration)),ease=t*t*(3-2*t);
+      const from=item.loading?cue.anchor.ground:cue.anchor,to=item.loading?cue.anchor:cue.anchor.ground;
+      item.mesh.position.set(from.x+(to.x-from.x)*ease,from.y+(to.y-from.y)*ease+(reducedMotion?0:Math.sin(t*Math.PI)*.36),from.z+(to.z-from.z)*ease);
+      item.mesh.visibility=Math.min(1,t*7,(1-t)*5);
+      item.mesh.scaling.setAll(.65+Math.sin(t*Math.PI)*.35);
+      item.mesh.rotation.y=reducedMotion?0:Math.sin(t*Math.PI)*.25;
+    }
+    cargoFeedback=reducedMotion?0:Math.sin(Math.min(1,cue.time/(cue.duration+.15))*Math.PI)*.025;
+    if(cue.time>=cue.duration+cue.items.at(-1).delay)clearCargoAnimation();
   }
   function sync(next) {
     const old=state;state=next;paused=!!next.paused;
@@ -259,7 +363,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     if(!moving&&next.location!==location){
       const p=places.get(next.location);if(p){position.set(p.x,.2,p.z);vehicle.position.copyFrom(position);location=next.location;}
     }
-    if(next.phase!=='moving'&&moving){moving=false;route=[];destination=null;}
+    if(next.phase!=='moving'&&moving){moving=false;motion=null;destination=null;departureTurn=null;}
     const blockSignature = JSON.stringify(next.blockedEdges || []);
     if (blockSignature !== blockedKey) {
       blockedKey = blockSignature; roadworksRoot?.dispose(false, false);
@@ -279,43 +383,41 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     }
     const key=JSON.stringify(next.cargo);
     if(key!==cargoKey){
-      cargoKey=key;cargoRoot?.dispose(false,false);cargoRoot=new TransformNode('cargo',scene);cargoRoot.parent=vehicle;
-      let index=0;
-      for(const item of next.cargo||[])for(let q=0;q<item.quantity&&index<6;q++,index++){
-        const good=GOODS.find(x=>x.id===item.goodId);
-        box('cargo-package',[(index%2-.5)*.5,1.65+Math.floor(index/4)*.38,-.45+Math.floor(index%4/2)*.46],[.41,.34,.4],good?.color||'#e7b76b',cargoRoot);
-      }
+      cargoKey=key;
+      if(old&&old.seed===next.seed&&old.vehicleId===next.vehicleId)animateCargo(old.cargo,next.cargo);
     }
+    if(old?.phase==='loading'&&next.phase==='explore')overview();
     if(old?.phase==='event'&&next.phase!=='event')burst('success',position,14);
     if(old?.phase!==next.phase&&next.phase==='event')rainTime=4;
   }
   function travel(points, placeId) {
     if(paused||moving||!Array.isArray(points)||!points.length)return;
-    route=points.map(p=>new Vector3(p.x,.2,p.z));routeIndex=0;destination=placeId;moving=true;
-    while(routeIndex<route.length&&Vector3.Distance(position,route[routeIndex])<.05)routeIndex++;
-    overviewMode=false;burst('dust',position,10);
+    motion=createRoadMotion(buildRoadPath([{x:position.x,z:position.z},...points]));destination=placeId;moving=true;
+    const from=vehicle?.rotation.y||0,delta=Math.atan2(Math.sin(motion.yaw-from),Math.cos(motion.yaw-from));
+    departureTurn=!reducedMotion&&Math.abs(delta)>.025?{from,delta,time:0,duration:Math.max(.2,Math.abs(delta)/3.8)}:null;
+    overview();burst('dust',position,10);
   }
   function overview(){overviewMode=true;}
   function effect(kind){if(kind==='rain'||kind==='weather')rainTime=5;else burst(kind==='start'?'dust':kind,position,kind==='reward'?35:12);}
   function update(dt) {
     dt=Math.min(Math.max(Number(dt)||0,0),.1);
-    if(paused)return;
     fitCamera(dt);
+    if(paused||previewId)return;
     clock+=dt;weatherTime+=dt;
+    updateCargoAnimation(dt);
     if(moving&&vehicle){
-      let remaining=dt*6.8;
-      while(remaining>0&&routeIndex<route.length){
-        const target=route[routeIndex],distance=Vector3.Distance(position,target);
-        const direction=target.subtract(position);
-        if(distance>.001)vehicle.rotation.y=Math.atan2(direction.x,direction.z);
-        if(distance<=remaining){position.copyFrom(target);remaining-=distance;routeIndex++;}
-        else {position.addInPlace(direction.scale(remaining/distance));remaining=0;}
-      }
+      if(departureTurn){
+        departureTurn.time+=dt;
+        const t=Math.min(1,departureTurn.time/departureTurn.duration);
+        vehicle.rotation.y=departureTurn.from+departureTurn.delta*t*t*(3-2*t);
+        if(t>=1)departureTurn=null;
+      }else{advanceRoadMotion(motion,dt);position.set(motion.x,.2,motion.z);vehicle.rotation.y=motion.yaw;}
       vehicle.position.copyFrom(position);
       travelDust+=dt;if(travelDust>.24){travelDust=0;burst('dust',position,2);}
-      if(routeIndex>=route.length){moving=false;location=destination;destination=null;burst('stop',position,8);onArrival(location);}
+      if(motion.done){moving=false;location=destination;destination=null;burst('stop',position,8);onArrival(location);}
     }
-    const cameraTarget=overviewMode?Vector3.Zero():new Vector3(position.x*.58,0,position.z*.58);
+    if(vehicle){vehicle.rotation.x=cargoFeedback;vehicle.rotation.z=-cargoFeedback*.55;}
+    const cameraTarget=mapFocus;
     aim.copyFrom(Vector3.Lerp(aim,cameraTarget,reducedMotion?1:1-Math.exp(-dt*2.3)));camera.setTarget(aim);
     if(weatherTime>35){weatherTime=0;rainTime=4.5;}
     if(rainTime>0){rainTime-=dt;if(!reducedMotion&&Math.floor(clock*15)!==Math.floor((clock-dt)*15))burst('rain',aim,3);}
@@ -362,7 +464,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     }else if(info.type===PointerEventTypes.POINTERUP){
       const previous=pressed;pressed=null;
       if(multiPointerGesture)return;
-      if(!previous||paused||moving||!['explore','delivery','loading'].includes(state?.phase))return;
+      if(!previous||paused||previewId||moving||!['explore','delivery','loading'].includes(state?.phase))return;
       if(event.pointerId!==previous.pointer||Math.hypot(event.clientX-previous.x,event.clientY-previous.y)>12)return;
       if(info.pickInfo?.pickedMesh?.metadata?.placeId===previous.id)onPlaceTap(previous.id);
     }
@@ -372,17 +474,17 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   canvas?.addEventListener('pointercancel',cancel);canvas?.addEventListener('lostpointercapture',cancel);
   const resizeObserver=engine.onResizeObservable.add(()=>fitCamera());
   return {
-    setMap,sync,travel,update,overview,effect,projectPlaces,setLayout,
+    setMap,sync,travel,update,overview,effect,projectPlaces,setLayout,setModelPreview,
     cancelInput(){pressed=null;heldPointers.clear();multiPointerGesture=false;},
     setPaused(value){paused=!!value;pressed=null;},
     setReducedMotion(value){reducedMotion=!!value;if(value){for(const p of particles.particles)p.isVisible=false;particles.setParticles();}},
-    getState(){return {position:{x:position.x,y:position.y,z:position.z},moving,location,vehicleId,meshCount:scene.meshes.length,orphanMeshCount:scene.meshes.filter(m=>m!==particleMesh&&!m.isDescendantOf(mapRoot)&&!m.isDescendantOf(vehicle)).length,particleCount:particles.particles.filter(p=>p.isVisible).length,particleLimit:96,weather:rainTime>0?'rain':'clear',camera:{overview:overviewMode,target:{x:aim.x,z:aim.z}},theme:map?.theme};},
+    getState(){return {position:{x:position.x,y:position.y,z:position.z},moving,location,vehicleId,speed:motion?.speed||0,heading:vehicle?.rotation.y||0,curvature:motion?.curvature||0,cargoAnimation:cargoAnimation?{time:cargoAnimation.time,count:cargoAnimation.items.length}:null,cargoMeshCount:cargoRoot?.getChildMeshes().length||0,meshCount:scene.meshes.length,orphanMeshCount:scene.meshes.filter(m=>m!==particleMesh&&!m.metadata?.modelPreview&&!m.isDescendantOf(mapRoot)&&!m.isDescendantOf(vehicle)).length,particleCount:particles.particles.filter(p=>p.isVisible).length,particleLimit:96,weather:rainTime>0?'rain':'clear',preview:{...modelPreview.getState(),zoom:previewZoom},camera:{overview:overviewMode,halfHeight:currentHalfHeight,target:{x:aim.x,z:aim.z}},theme:map?.theme,landmarks:[...placement].map(([id,p])=>({id,rotation:p.rotation}))};},
     dispose(){
       scene.onPointerObservable.remove(observer);engine.onResizeObservable.remove(resizeObserver);
       canvas?.removeEventListener('pointercancel',cancel);canvas?.removeEventListener('lostpointercapture',cancel);
       canvas?.removeEventListener('pointerdown',trackDown,true);canvas?.removeEventListener('pointerup',trackUp,true);canvas?.removeEventListener('pointercancel',trackUp,true);
       for(const instance of mapInstances.splice(0))instance.dispose();mapRoot?.dispose(false,false);
-      cargoRoot?.dispose(false,false);vehicleAsset?.dispose();particles.dispose();particleMaterial.dispose();
+      modelPreview.dispose();clearCargoAnimation();vehicleAsset?.dispose();particles.dispose();particleMaterial.dispose();
       for(const material of materials.values())material.dispose();shadows.dispose();camera.dispose();ambient.dispose();sun.dispose();
     },
   };

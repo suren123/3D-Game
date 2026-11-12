@@ -3,6 +3,20 @@ import assert from 'node:assert/strict';
 import { createGame, generateMap, findRoute } from '../src/v2/rules.js';
 import { GOODS, VEHICLES, PLACES, THEMES, TEMPLATES, EVENTS } from '../src/v2/catalog.js';
 
+const edgeKey = edge => [...edge].sort().join(':');
+
+function assertRoadRoute(map, route, blockedEdges = []) {
+  const roads = new Set(map.edges.map(edgeKey));
+  const blocked = new Set(blockedEdges.map(edgeKey));
+  const nodeAt = point => map.nodes.find(node => node.x === point.x && node.z === point.z)?.id;
+  assert.ok(route.length, 'route reaches its destination');
+  for (let i = 1; i < route.length; i++) {
+    const road = edgeKey([nodeAt(route[i - 1]), nodeAt(route[i])]);
+    assert.ok(roads.has(road), 'route follows a real road instead of cutting across a block');
+    assert.ok(!blocked.has(road), 'route does not enter a closed road');
+  }
+}
+
 function chooseVehicle(game) {
   game.dispatch({ type: 'ACK_BRIEF' });
   const state = game.getState();
@@ -80,19 +94,54 @@ function afterFirstDelivery(seed, difficulty = 'challenge', fullLoad = true) {
   return game;
 }
 
-test('finite content has six vehicles, twelve goods, six task templates, three themes and four events', () => {
+test('finite content has six vehicles, twelve goods, nine named places, eight task templates, three themes and four events', () => {
   assert.equal(VEHICLES.length, 6); assert.equal(GOODS.length, 12);
-  assert.equal(TEMPLATES.length, 6); assert.equal(THEMES.length, 3); assert.equal(EVENTS.length, 4);
+  assert.equal(PLACES.length, 9); assert.equal(TEMPLATES.length, 8); assert.equal(THEMES.length, 3); assert.equal(EVENTS.length, 4);
   for (const list of [VEHICLES, GOODS, TEMPLATES, PLACES, THEMES, EVENTS]) assert.equal(new Set(list.map(item => item.id)).size, list.length);
+  assert.deepEqual(PLACES.map(place => place.name), ['仓库', '公园', '学校', '医院', '农场', '餐厅', '车库', '商店', '营地']);
+  for (const template of TEMPLATES) {
+    assert.ok(template.goods.length >= 3);
+    assert.equal(template.places.length, 2, 'normal errands still ask for exactly two destinations');
+    for (const goodId of template.goods) assert.ok(GOODS.some(good => good.id === goodId));
+    for (const placeId of template.places) assert.ok(PLACES.some(place => place.id === placeId));
+  }
+  assert.ok(TEMPLATES.find(template => template.id === 'restock').places.includes('shop'));
+  assert.ok(TEMPLATES.find(template => template.id === 'camping').places.includes('camp'));
 });
 
 test('1000 seeds have connected varying maps, valid missions and fully completable three-errand sessions at every difficulty', () => {
-  const layouts = new Set(), themes = new Set(), templates = new Set(), events = new Set(), goods = new Set();
+  const layouts = new Set(), topologies = new Set(), themes = new Set(), templates = new Set(), events = new Set(), goods = new Set(), destinations = new Set();
   for (let seed = 0; seed < 1000; seed++) {
     const map = generateMap(seed);
     assert.deepEqual(map, generateMap(seed));
+    assert.equal(map.nodes.length, 16);
+    assert.equal(map.places.length, 9);
+    assert.equal(new Set(map.nodes.map(node => node.x)).size, 4);
+    assert.equal(new Set(map.nodes.map(node => node.z)).size, 4);
+    assert.ok(map.nodes.every(node => Math.abs(node.x) <= 13.5 && Math.abs(node.z) <= 13.5), 'a larger grid keeps compact toy-town spacing');
+    assert.ok(map.edges.length >= 18 && map.edges.length <= 20, 'connected roads retain several loops');
+    const degrees = new Map(map.nodes.map(node => [node.id, 0]));
+    for (const edge of map.edges) for (const nodeId of edge) degrees.set(nodeId, degrees.get(nodeId) + 1);
+    assert.ok([...degrees.values()].includes(1), 'each map has a short side branch');
+    const reached = new Set([map.nodes[0].id]);
+    for (let i = 0; i < map.nodes.length; i++) for (const [from, to] of map.edges) {
+      if (reached.has(from)) reached.add(to);
+      if (reached.has(to)) reached.add(from);
+    }
+    assert.equal(reached.size, 16, 'every road junction is connected, including empty ones');
+    assert.equal(new Set(map.edges.map(edgeKey)).size, map.edges.length);
+    for (const [fromId, toId] of map.edges) {
+      const from = map.nodes.find(node => node.id === fromId), to = map.nodes.find(node => node.id === toId);
+      const distance = Math.abs(from.x - to.x) + Math.abs(from.z - to.z);
+      assert.ok(distance === 8 || distance === 9, 'roads join adjacent grid nodes');
+    }
     assert.equal(new Set(map.places.map(place => place.nodeId)).size, PLACES.length);
+    for (const place of map.places) {
+      const node = map.nodes.find(node => node.id === place.nodeId);
+      assert.deepEqual({ x: place.x, z: place.z }, { x: node.x, z: node.z });
+    }
     layouts.add(JSON.stringify({ places: map.places, edges: map.edges }));
+    topologies.add(JSON.stringify(map.edges));
     themes.add(map.theme);
     for (const from of PLACES) for (const to of PLACES) assert.ok(findRoute(map, from.id, to.id).length, `${seed}: ${from.id} to ${to.id}`);
     for (const difficulty of ['easy', 'normal', 'challenge']) {
@@ -103,8 +152,8 @@ test('1000 seeds have connected varying maps, valid missions and fully completab
         templates.add(mission.templateId);
         assert.equal(mission.steps.length, difficulty === 'easy' ? 1 : difficulty === 'normal' ? 2 : 3);
         assert.equal(mission.ordered, difficulty === 'challenge');
-        assert.ok(new Set(mission.steps.map(step => step.placeId)).size <= 2);
-        for (const step of mission.steps) { assert.ok(mission.shelf.includes(step.goodId)); goods.add(step.goodId); }
+        assert.equal(new Set(mission.steps.map(step => step.placeId)).size, difficulty === 'easy' ? 1 : 2);
+        for (const step of mission.steps) { assert.ok(mission.shelf.includes(step.goodId)); goods.add(step.goodId); destinations.add(step.placeId); }
         solveMission(game, seed % 2);
         assert.deepEqual(game.getState().map, originalMap, 'landmarks do not shift during a session');
         game.dispatch({ type: 'NEXT' });
@@ -118,7 +167,42 @@ test('1000 seeds have connected varying maps, valid missions and fully completab
     }
   }
   assert.ok(layouts.size > 990);
-  assert.equal(themes.size, 3); assert.equal(templates.size, 6); assert.equal(events.size, 4); assert.equal(goods.size, 12);
+  assert.ok(topologies.size > 900, 'towns vary their road network as well as their landmarks');
+  assert.equal(themes.size, 3); assert.equal(templates.size, 8); assert.equal(events.size, 4); assert.equal(goods.size, 12);
+  assert.deepEqual([...destinations].sort(), PLACES.filter(place => place.id !== 'depot').map(place => place.id).sort());
+});
+
+test('roadworks provides real road detours, keeps every place reachable, and can reopen the original route', () => {
+  let closures = 0, changedRoutes = 0;
+  for (let seed = 0; seed < 160; seed++) {
+    const game = afterFirstDelivery(seed);
+    const before = game.getState();
+    if (before.event?.id !== 'roadworks') continue;
+    closures++;
+    assert.equal(before.blockedEdges.length, 1);
+    assert.ok(before.map.edges.some(edge => edgeKey(edge) === edgeKey(before.blockedEdges[0])));
+    for (const from of PLACES) for (const to of PLACES) {
+      const original = findRoute(before.map, from.id, to.id);
+      const detour = findRoute(before.map, from.id, to.id, before.blockedEdges);
+      assertRoadRoute(before.map, detour, before.blockedEdges);
+      if (JSON.stringify(original) !== JSON.stringify(detour)) changedRoutes++;
+    }
+    game.dispatch({ type: 'RESOLVE_EVENT', optionId: 'detour' });
+    assert.deepEqual(game.getState().blockedEdges, before.blockedEdges);
+    finishDeliveries(game);
+    game.dispatch({ type: 'NEXT' });
+    assert.deepEqual(game.getState().blockedEdges, [], 'temporary roadworks never leak into the next errand');
+
+    const reopened = afterFirstDelivery(seed);
+    reopened.dispatch({ type: 'RESOLVE_EVENT', optionId: 'reopen' });
+    assert.deepEqual(reopened.getState().blockedEdges, []);
+    for (const place of PLACES) {
+      assert.deepEqual(findRoute(before.map, before.location, place.id), findRoute(reopened.getState().map, before.location, place.id, reopened.getState().blockedEdges));
+    }
+    finishDeliveries(reopened);
+  }
+  assert.ok(closures > 20, 'many different road networks exercise both recovery choices');
+  assert.ok(changedRoutes > closures, 'closures actually change routes rather than only changing a flag');
 });
 
 test('memory mistakes preserve cargo and progress; free exploration allows returning for forgotten cargo', () => {
@@ -220,7 +304,7 @@ test('each event has two valid recovery choices with real state effects and pres
 
 test('capacity trailer carries everything while two trips must recover safely stored cargo from the depot', () => {
   for (const optionId of ['trailer', 'two-trips']) {
-    const game = afterFirstDelivery(11);
+    const game = afterFirstDelivery(19); // Cargo-only errand allows changing between suitable vehicles.
     const before = game.getState();
     assert.equal(before.event.id, 'capacity');
     assert.equal(VEHICLES.find(vehicle => vehicle.id === before.vehicleId).capacity + before.capacityBonus, 1);
@@ -387,7 +471,7 @@ test('changing sessions is deterministic and preserves earned rewards; snapshots
   const unsubscribe = game.subscribe(state => { calls++; state.phase = 'reward'; });
   assert.equal(calls, 0);
   const snapshot = game.getState(); snapshot.map.places.length = 0; snapshot.mission.steps[0].quantity = 100;
-  assert.equal(game.getState().map.places.length, 7);
+  assert.equal(game.getState().map.places.length, 9);
   game.dispatch({ type: 'ACK_BRIEF' });
   assert.equal(calls, 1); assert.equal(game.getState().phase, 'selectVehicle');
   unsubscribe();

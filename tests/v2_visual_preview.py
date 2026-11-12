@@ -15,12 +15,13 @@ async def run():
   baseline=len(requests);await ctx.set_offline(True)
   await click(p,'start');await prepare(p);await fill(p);await click(p,'depart');await p.wait_for_timeout(1200)
   s=await snap(p)
-  assert len(s['manifest']['models'])==25
+  assert len(s['manifest']['models'])==27
   assert all('place-'+place['id'] in s['bounds'] for place in s['state']['map']['places'])
   await p.screenshot(path=str(OUT/'visual-preview-overview.png'))
-  await click(p,'place-cafe');await phase(p,'delivery');await p.wait_for_timeout(1400)
+  step=s['state']['mission']['steps'][0]
+  await click(p,'place-'+step['placeId']);await phase(p,'delivery');await p.wait_for_timeout(1400)
   await p.screenshot(path=str(OUT/'visual-preview-close.png'))
-  for _ in range(2):await click(p,'deliver-flowers')
+  for _ in range(step['quantity']):await click(p,'deliver-'+step['goodId'])
   await phase(p,'reward')
   assert (await snap(p))['state']['rewardCount']==1
   for _ in range(10):
@@ -29,8 +30,8 @@ async def run():
    cycles.append({'seed':s['state']['seed'],'meshes':s['render']['meshes']})
   assert len(requests)==baseline,requests[baseline:]
   assert not errors,errors
-  (OUT/'visual-preview.json').write_text(json.dumps({'offlineDelivery':True,'allSevenMarkersVisible':True,'mapCycles':cycles,'requestsAfterReady':len(requests)-baseline,'errors':errors,'limitations':'Cloud software Chromium; visual preview branch, not deployed; no physical iPad performance claim.'},ensure_ascii=False,indent=2))
-  print('PASS visual preview: 25 models, seven markers, offline delivery, ten maps without orphan meshes or new requests',flush=True)
+  (OUT/'visual-preview.json').write_text(json.dumps({'offlineDelivery':True,'allNineMarkersVisible':True,'mapCycles':cycles,'requestsAfterReady':len(requests)-baseline,'errors':errors,'limitations':'Cloud software Chromium; no physical iPad performance claim.'},ensure_ascii=False,indent=2))
+  print('PASS visual preview: 27 models, nine markers, offline delivery, ten maps without orphan meshes or new requests',flush=True)
   await browser.close()
 
 asyncio.run(run())

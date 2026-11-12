@@ -1,0 +1,79 @@
+[
+  {
+    "file": "shop-shelf-boxes.glb",
+    "source": "https://kenney.nl/assets/mini-shop",
+    "archivePath": "Models/GLB format/shelf-boxes.glb",
+    "license": "mini-shop-License.txt",
+    "licenseId": "CC0-1.0",
+    "modification": "Embed the original colormap PNG in GLB; preserve geometry/materials/node transforms",
+    "originalSha256": "f47d8d556b05c5557e0c078d09601de883aa33fd6b7d1b25abe2da7e35b8281f",
+    "distributedSha256": "2aef0ec8c1ed63677dcb80abbe17094f8afb3f1002142d18be1a301a9de88e70",
+    "bytes": 115836
+  },
+  {
+    "file": "shop-display-fruit.glb",
+    "source": "https://kenney.nl/assets/mini-shop",
+    "archivePath": "Models/GLB format/display-fruit.glb",
+    "license": "mini-shop-License.txt",
+    "licenseId": "CC0-1.0",
+    "modification": "Embed the original colormap PNG in GLB; preserve geometry/materials/node transforms",
+    "originalSha256": "59d0c1451ced220614526ee6a994d44c0cadfb057a1d0738f50fdd05affb8581",
+    "distributedSha256": "d9eabb4261b7bdbdbd5734b035e001d4c233ad7597f5029958c1c09b951329dd",
+    "bytes": 100264
+  },
+  {
+    "file": "shop-cash-register.glb",
+    "source": "https://kenney.nl/assets/mini-shop",
+    "archivePath": "Models/GLB format/cash-register.glb",
+    "license": "mini-shop-License.txt",
+    "licenseId": "CC0-1.0",
+    "modification": "Embed the original colormap PNG in GLB; preserve geometry/materials/node transforms",
+    "originalSha256": "040ede4169cb1a7690d4694a0585a732fa36916d651cc9e7132f332e9240320b",
+    "distributedSha256": "b85df0797fcc369fce4212c974bb674e27969fea65168f442ac7d0a8bab93e3b",
+    "bytes": 69536
+  },
+  {
+    "file": "forest-tent.glb",
+    "source": "https://kenney.nl/assets/mini-forest",
+    "archivePath": "Models/GLB format/tent.glb",
+    "license": "mini-forest-License.txt",
+    "licenseId": "CC0-1.0",
+    "modification": "Embed the original colormap PNG in GLB; preserve geometry/materials/node transforms",
+    "originalSha256": "a3f6e7a1597ccbf57f5345e6647844e21f632e03c5faae9a45af7140c7371262",
+    "distributedSha256": "a6fb9480753e6c1de30601aa4d1f90a56e865c326b25a19e2373ac9387201468",
+    "bytes": 88608
+  },
+  {
+    "file": "forest-tree.glb",
+    "source": "https://kenney.nl/assets/mini-forest",
+    "archivePath": "Models/GLB format/tree.glb",
+    "license": "mini-forest-License.txt",
+    "licenseId": "CC0-1.0",
+    "modification": "Embed the original colormap PNG in GLB; preserve geometry/materials/node transforms",
+    "originalSha256": "0075d5059c1ea855fecc1dba3c6262c3a01924c50b971ddde2eb8b0b5a62851a",
+    "distributedSha256": "894184e98d4acdb80f848f759a52e65b18f6fce1b5a90fcbc8b3061f0b506e85",
+    "bytes": 34184
+  },
+  {
+    "file": "forest-flag.glb",
+    "source": "https://kenney.nl/assets/mini-forest",
+    "archivePath": "Models/GLB format/flag.glb",
+    "license": "mini-forest-License.txt",
+    "licenseId": "CC0-1.0",
+    "modification": "Embed the original colormap PNG in GLB; preserve geometry/materials/node transforms",
+    "originalSha256": "0109c325cd873be628107da549a18a2345b1318062807050038be0361f5cad97",
+    "distributedSha256": "8e20bf42d372f010cd7565e7f1e7582caae492a8498e366e993b27dd3f501ac9",
+    "bytes": 27316
+  },
+  {
+    "file": "forest-stones.glb",
+    "source": "https://kenney.nl/assets/mini-forest",
+    "archivePath": "Models/GLB format/stones.glb",
+    "license": "mini-forest-License.txt",
+    "licenseId": "CC0-1.0",
+    "modification": "Embed the original colormap PNG in GLB; preserve geometry/materials/node transforms",
+    "originalSha256": "f46682b8eb8110fabe17f1da8e226bd2471046a25d907e41fd43ad9695f4c397",
+    "distributedSha256": "844c88c6ade1ef5b3d76a9d60817dd76e9b2c59ca831568bdaa30fe2f3fb2e13",
+    "bytes": 33836
+  }
+]

@@ -1,8 +1,11 @@
 // Reproducible offline low-poly toy props. No runtime geometry downloads, fonts,
-// textures, Blender installation or native exporter is required.
+// Blender installation or native exporter is required. Two landmarks include
+// the curated CC0 Kenney Mini meshes and their original embedded colormaps.
 // glTF 2.0 meshes are merged by material; all binary buffers are embedded in GLB.
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { spawnSync } from 'node:child_process';
 
 const OUTPUT = fileURLToPath(new URL('../public/models/town-v2/', import.meta.url));
 await mkdir(OUTPUT, { recursive: true });
@@ -24,13 +27,18 @@ function builder() {
     const l=Math.hypot(...n)||1;n=n.map(x=>x/l);
     const start=g.p.length/3;g.p.push(...a,...b,...c);g.n.push(...n,...n,...n);g.i.push(start,start+1,start+2);
   }
-  function box(name,x,y,z,w,h,d,angle=0) {
-    const points=[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]].map(([a,b,c])=>{
-      a*=w/2;b*=h/2;c*=d/2;return [x+a*Math.cos(angle)+c*Math.sin(angle),y+b,z-a*Math.sin(angle)+c*Math.cos(angle)];
-    });
-    for(const [a,b,c,d] of [[0,3,2,1],[4,5,6,7],[0,4,7,3],[1,2,6,5],[3,7,6,2],[0,1,5,4]]) {
-      triangle(name,points[a],points[b],points[c]); triangle(name,points[a],points[c],points[d]);
-    }
+  function box(name,x,y,z,w,h,d,angle=0,roll=0) {
+    // One bevel segment keeps the soft Mini silhouette without smooth cubes
+    // or a browser-time modelling dependency. Thin sign strokes stay crisp.
+    const geometry=new RoundedBoxGeometry(w,h,d,1,Math.min(w,h,d)*.12);
+    const p=geometry.attributes.position;
+    const point=i=>{
+      const a=p.getX(i),b=p.getY(i),c=p.getZ(i);
+      const rx=a*Math.cos(roll)-b*Math.sin(roll),ry=a*Math.sin(roll)+b*Math.cos(roll);
+      return [x+rx*Math.cos(angle)+c*Math.sin(angle),y+ry,z-rx*Math.sin(angle)+c*Math.cos(angle)];
+    };
+    for(let i=0;i<p.count;i+=3)triangle(name,point(i),point(i+1),point(i+2));
+    geometry.dispose();
   }
   function cylinder(name,x,y,z,r,h,top=r,sides=10) {
     for(let i=0;i<sides;i++){
@@ -70,7 +78,7 @@ function builder() {
     };
     for(const [color,g] of groups){
       const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];g.p.forEach((v,i)=>{min[i%3]=Math.min(min[i%3],v);max[i%3]=Math.max(max[i%3],v);});
-      const position=add(new Float32Array(g.p),5126,'VEC3',min,max),normal=add(new Float32Array(g.n),5126,'VEC3'),indices=add(new Uint16Array(g.i),5123,'SCALAR');
+      const position=add(new Float32Array(g.p),5126,'VEC3',min,max),normal=add(new Float32Array(g.n),5126,'VEC3'),indices=add(g.i.length>65535?new Uint32Array(g.i):new Uint16Array(g.i),g.i.length>65535?5125:5123,'SCALAR');
       const material=json.materials.length;json.materials.push({name:color,pbrMetallicRoughness:{baseColorFactor:rgba(palette[color]),metallicFactor:0,roughnessFactor:1},doubleSided:false});
       json.meshes[0].primitives.push({attributes:{POSITION:position,NORMAL:normal},indices,material});
     }
@@ -84,7 +92,7 @@ function builder() {
   return {box,cylinder,ball,roof,window,door,house,save};
 }
 
-for(const id of ['depot','park','school','hospital','farm','cafe','garage','house','tree','bush','bench','flowers','bus','tanker']){
+for(const id of ['depot','park','school','hospital','farm','cafe','garage','house','tree','bush','bench','flowers','bus','tanker','shop','camp']){
   const b=builder(),{box,cylinder,ball,roof,window,door,house}=b;
   if(id==='bus'||id==='tanker'){
     box('dark',0,.4,0,1.4,.25,3.4);
@@ -104,7 +112,9 @@ for(const id of ['depot','park','school','hospital','farm','cafe','garage','hous
     box('cream',0,1.35,0,3.6,2.7,2.7);roof('yellow',0,2.7,0,4,.7,3.1);
     box('teal',0,1.1,-1.39,2.3,2.1,.12);for(let i=0;i<4;i++)box('mint',0,.45+i*.43,-1.48,2.1,.08,.05);
     box('white',0,2.45,-1.42,1.65,.48,.2);box('yellow',0,2.45,-1.56,.46,.36,.15);
-    for(const [x,z] of [[-2,-1],[1.95,-1.2],[2.0,-.3]]){box('brown',x,.35,z,.65,.7,.65);box('cream',x,.35,z-.34,.1,.62,.04);}
+    for(const [x,z] of [[-1.4,-1.8],[1.25,-1.75],[1.35,-1.05]]){box('brown',x,.35,z,.72,.7,.65);box('cream',x,.35,z-.34,.1,.62,.04);box('cream',x,.35,z-.35,.64,.10,.04);}
+    // An oversized parcel roof sign is readable from the fixed high camera.
+    box('cream',0,3.48,0,1.22,.86,1.04);box('coral',0,3.49,-.54,.18,.72,.06);box('coral',0,3.93,0,.18,.05,1.02);
   }else if(id==='park'){
     cylinder('sand',0,.08,0,2.35,.16,2.35,20);cylinder('white',0,.3,0,1.25,.55,1.25,16);cylinder('blue',0,.59,0,1.05,.05,1.05,16);
     cylinder('cream',0,.9,0,.25,.9,.2,8);cylinder('blue',0,1.28,0,.75,.12,.75,12);ball('blue',0,1.63,0,.25);
@@ -112,24 +122,56 @@ for(const id of ['depot','park','school','hospital','farm','cafe','garage','hous
   }else if(id==='school'){
     box('yellow',0,1.4,0,3.8,2.8,2.8);roof('coral',0,2.8,0,4.2,.9,3.2);door(0,-1.46);
     for(const x of [-1.25,1.25]){window(x,1.7,-1.46,.65,.8);window(x,1.7,1.46,.65,.8);}
-    box('cream',0,3.6,0,.9,.8,.9);roof('teal',0,4,0,1.2,.65,1.2);cylinder('cream',2.4,1.7,-.6,.065,3.4,.065,6);box('coral',2.8,3.05,-.6,.8,.45,.06);
+    box('cream',0,3.6,0,.9,.8,.9);roof('teal',0,4,0,1.2,.65,1.2);cylinder('cream',1.7,1.7,-.6,.065,3.4,.065,6);box('coral',1.93,3.05,-.6,.45,.45,.06);
+    // School gate, bell and book badge distinguish it from a house.
+    for(const x of [-1.65,1.65]){box('teal',x,.6,-1.9,.27,1.2,.3);ball('yellow',x,1.28,-1.9,.19);}
+    box('teal',0,1.4,-1.9,3.55,.28,.32);box('white',0,1.43,-2.09,1.1,.57,.1);
+    box('blue',-.23,1.44,-2.16,.42,.38,.07,0,-.12);box('coral',.23,1.44,-2.16,.42,.38,.07,0,.12);
+    cylinder('yellow',0,3.9,-.52,.25,.4,.17,10);
   }else if(id==='hospital'){
     box('white',0,1.6,0,3.7,3.2,2.8);box('blue',0,3.22,0,4.05,.26,3.1);door(0,-1.46);
     for(const x of [-1.23,1.23])for(const y of [1.0,2.2])window(x,y,-1.46,.66,.65);
-    box('white',0,3.85,0,1.15,1.15,.3);box('coral',0,3.85,-.2,.72,.23,.12);box('coral',0,3.85,-.2,.23,.72,.12);
+    box('white',0,3.9,0,1.55,1.5,.35);box('coral',0,3.9,-.23,1.13,.36,.16);box('coral',0,3.9,-.23,.36,1.13,.16);
+    box('coral',0,3.39,.65,1.18,.12,.36);box('coral',0,3.4,.65,.36,.13,1.18);
   }else if(id==='farm'){
     house(3.2,2.3,2.7,'coral','cream');box('white',0,1,-1.44,1.25,1.8,.1);box('brown',0,.95,-1.51,1.05,1.6,.08);
-    for(const x of [-2.2,2.2]){cylinder('yellow',x,.5,.5,.55,1,.55,10);box('cream',x,.5,.5,1.2,.1,.1);}
-    for(let i=0;i<3;i++){box('brown',2.3,.05,-1+i*.5,.9,.12,.27);ball('leaf',2.3,.28,-1+i*.5,.3,1,.8,.6);}
+    for(const x of [-1.85,1.85]){cylinder('yellow',x,.4,.5,.35,.8,.35,10);box('cream',x,.4,.5,.75,.1,.1);}
+    for(let i=0;i<3;i++){box('brown',1.95,.05,-1+i*.5,.5,.12,.27);ball('leaf',1.95,.28,-1+i*.5,.24,1,.8,.6);}
+    // White barn-door braces and a roof rooster-like weather vane.
+    box('white',-.26,1,-1.59,.12,1.5,.07,0,-.55);box('white',.26,1,-1.59,.12,1.5,.07,0,.55);
+    cylinder('brown',0,3.7,0,.045,.6,.045,6);ball('yellow',0,4.02,0,.21,1.5,1,.5);ball('coral',.26,4.2,0,.1);
   }else if(id==='cafe'){
     house(3.1,2.3,2.7,'pink','teal');for(let i=0;i<7;i++)box(i%2?'white':'coral',-1.35+i*.45,1.86,-1.68,.45,.22,.9);
     for(const x of [-1.0,1.0])window(x,1.08,-1.42,.65,.8);
-    cylinder('brown',2.35,.7,-.8,.1,1.4,.1,8);cylinder('cream',2.35,1.42,-.8,.75,.14,.75,12);
-    cylinder('teal',2.35,2.15,-.8,.03,1.4,.03,6);cylinder('yellow',2.35,2.75,-.8,1.2,.55,0,8);
+    cylinder('brown',1.6,.55,-1.45,.08,1.1,.08,8);cylinder('cream',1.6,1.12,-1.45,.52,.12,.52,12);
+    // Oversized roof cup, saucer and coffee surface.
+    cylinder('cream',0,3.6,0,.68,.13,.68,12);cylinder('white',0,3.98,0,.43,.68,.55,12);cylinder('brown',0,4.33,0,.44,.025,.44,12);
+    ball('white',.56,4.04,0,.29,.7,1,.55);ball('pink',.56,4.04,-.08,.15,.65,1,.3);
   }else if(id==='garage'){
     box('teal',0,1.3,0,3.7,2.6,2.7);box('cream',0,2.65,0,4.1,.25,3.1);
     box('navy',0,1.1,-1.39,2.7,2.2,.1);for(let i=0;i<5;i++)box('mint',0,.3+i*.4,-1.46,2.4,.07,.06);
-    box('yellow',0,2.9,-.9,1.5,.45,.2);for(const x of [-1.9,1.9]){cylinder('dark',x,.25,-1.8,.4,.5,.4,12);cylinder('cream',x,.55,-1.8,.2,.15,.2,10);}
+    box('yellow',0,3.03,-.9,1.65,.8,.24);
+    // Large raised wrench: diagonal shaft and two open jaws.
+    box('navy',-.13,3.02,-1.06,.16,.7,.08,0,-.6);ball('navy',-.32,2.76,-1.06,.15,1,1,.35);
+    box('navy',.21,3.29,-1.06,.15,.3,.08,0,-.72);box('navy',.40,3.15,-1.06,.15,.3,.08,0,-.72);
+    for(const x of [-1.85,1.85]){cylinder('dark',x,.25,-1.65,.3,.5,.3,12);cylinder('cream',x,.55,-1.65,.17,.15,.17,10);}
+    for(const x of [-.7,.7])box('white',x,.025,-1.8,.08,.04,.65);box('white',0,.025,-2.1,1.45,.04,.08);
+  }else if(id==='shop'){
+    // Open-front market. Genuine Mini Shop shelves and checkout are appended
+    // by import_mini_assets.py; the broad awning stays behind the goods.
+    box('cream',0,.09,0,4,.18,3.8);box('mint',0,1.15,1.55,3.8,2.15,.3);
+    for(const x of [-1.75,1.75]){box('cream',x,1.17,.25,.22,2.15,2.6);box('teal',x,1.3,-1.1,.16,2.55,.16);}
+    box('teal',0,2.43,.25,4.05,.25,3.1);
+    for(let i=0;i<8;i++)box(i%2?'white':'coral',-1.75+i*.5,2.28,-1.39,.5,.3,.8);
+    box('white',0,2.93,.25,1.42,.78,.18);box('coral',0,2.99,.13,.78,.38,.09);
+    // Shopping bag badge: basket body and two handle posts.
+    box('yellow',0,2.92,.06,.57,.34,.12);box('yellow',-.18,3.17,.06,.08,.24,.12);box('yellow',.18,3.17,.06,.08,.24,.12);box('yellow',0,3.28,.06,.42,.08,.12);
+  }else if(id==='camp'){
+    cylinder('sand',0,.07,0,2.1,.14,2.1,20);
+    // Mini Forest tent, pine trees, flag and stones fill this camp.
+    // A warm picnic crate and a log seating area keep its use non-combat.
+    box('brown',1.0,.3,-1.2,.65,.6,.65);box('cream',1,.3,-1.54,.12,.5,.04);
+    for(const x of [-.4,.4])cylinder('bark',x,.22,-1.35,.18,.44,.18,8);
   }else if(id==='house')house(2.3,1.9,2.3,'cream','purple');
   else if(id==='tree'){
     cylinder('bark',0,.7,0,.16,1.4,.12,7);ball('darkleaf',0,1.8,0,1,1,1.15,1);ball('leaf',-.45,2.15,-.2,.65);ball('green',.5,2.0,.15,.68);
@@ -144,4 +186,6 @@ for(const id of ['depot','park','school','hospital','farm','cafe','garage','hous
   }
   await b.save(id);
 }
-await writeFile(`${OUTPUT}/README.md`, `# Toy town models\n\nOriginal low-poly models generated by this project with \`node scripts/generate_models.mjs\`.\nAll shapes are original geometry, using no downloaded textures or fonts. GLB 2.0, Y-up, ground at Y=0; building fronts face -Z; bus and tanker fronts face +Z.\nBuildings are approximately 3–4 units wide and trees 3 units high. Meshes are merged by material.\nMaterial colours are embedded linear RGB, with zero metallic and full roughness.\nThe files are reusable offline resources, not generated in the browser.\n`);
+const mini = spawnSync('python3', [fileURLToPath(new URL('./import_mini_assets.py', import.meta.url)), '--compose'], {stdio:'inherit'});
+if(mini.status!==0)throw new Error('Mini composition failed. Run python3 scripts/import_mini_assets.py --download first.');
+await writeFile(`${OUTPUT}/README.md`, `# Toy town models\n\nRegenerate with \`node scripts/generate_models.mjs\`. The original toy geometry is made offline, with beveled box edges and landmark badges. Original geometry is merged by material. No fonts, Blender or browser-time modelling are required.\n\n\`shop.glb\` and \`camp.glb\` combine original town geometry with genuine Kenney Mini Shop 2.1 and Mini Forest 1.0 meshes (CC0-1.0). Their original colormap PNGs are embedded inside each GLB. The other 14 GLBs contain original geometry and embedded material colours, with no external texture files. See \`../kenney-mini/\` for the seven selected standalone models, exact licenses and \`sources.json\` provenance. To refresh those source files from Kenney, run \`python3 scripts/import_mini_assets.py --download\` before regenerating.\n\nGLB 2.0, Y-up; foundations sit at Y=0; building fronts face -Z; bus and tanker fronts face +Z. Existing location IDs and the world scale of 1.24 remain compatible. Shop measures 4.05 × 3.32 × 3.80 units (X/Y/Z), camp 4.20 × 2.67 × 4.20. Other buildings are approximately 3–4.5 units wide. All delivered resources work offline and require no Draco, Meshopt or additional image requests.\n`);

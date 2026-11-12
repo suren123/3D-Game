@@ -1,0 +1,62 @@
+{
+  "depot": {
+    "model": "models/town-v2/depot.glb",
+    "sha256": "323495098c9f276e775f5a8bc3a1373bbef6b48e08e05a05def248ad9173bddd"
+  },
+  "park": {
+    "model": "models/town-v2/park.glb",
+    "sha256": "8b814b0b0842eb363f79b74c0ec1c96466c19a97530082eb096385e4ca80896e"
+  },
+  "school": {
+    "model": "models/town-v2/school.glb",
+    "sha256": "bd673825af3bc0a94af18cd5aacbca2ef3c0183b89b2e8dd3990d05b42e77269"
+  },
+  "hospital": {
+    "model": "models/town-v2/hospital.glb",
+    "sha256": "37301b9b18ffce2b6c863443cc16a9ed0d89dbf4c4c0b456f1f10677643f51c3"
+  },
+  "farm": {
+    "model": "models/town-v2/farm.glb",
+    "sha256": "5366f9c791af2514efa507f16babeb4afec134936c302b7cd25a7474ef6c6c36"
+  },
+  "cafe": {
+    "model": "models/town-v2/cafe.glb",
+    "sha256": "3396eb7a6fef9de85b9878de2d5407d63ba3296e71d7ff5c821a0ed009eb5d22"
+  },
+  "garage": {
+    "model": "models/town-v2/garage.glb",
+    "sha256": "ace38db48ecfcb0ba24f7615420a6d68b0cef2496103770feac2a68b1fe93ec2"
+  },
+  "shop": {
+    "model": "models/town-v2/shop.glb",
+    "sha256": "c8035479ec191965c77e0995219aea0929a6675f1b9b1fda01c943cecd4d87fa"
+  },
+  "camp": {
+    "model": "models/town-v2/camp.glb",
+    "sha256": "37d6d3a1f810a1637d0bcda8debecdac749c5058f94cc47e9bad162462f11a3b"
+  },
+  "van": {
+    "model": "models/kenney-car/van.glb",
+    "sha256": "ed4ed56e8e5ed98db050af09ed2062b3b6bb7b93eab1e563cb6774b387b233a1"
+  },
+  "truck": {
+    "model": "models/kenney-car/truck.glb",
+    "sha256": "5e1bc66c343501dd7d5734b57e672dd949bf95d7abdce680c6508cef99d374f8"
+  },
+  "fridge": {
+    "model": "models/kenney-car/delivery.glb",
+    "sha256": "426a3e3a2c242c05c889b1445ba02ef95b2c8b7cd6f597e1275ef736a826014b"
+  },
+  "tanker": {
+    "model": "models/town-v2/tanker.glb",
+    "sha256": "cd12067e0627486dbd256565d0ab0d8620fe7610af07c9abb165bb3182b42a43"
+  },
+  "repair": {
+    "model": "models/kenney-car/truck-flat.glb",
+    "sha256": "4279862f2442e96c6603c514edf50bfb932707545695d8c4747611cd3796cf3b"
+  },
+  "bus": {
+    "model": "models/town-v2/bus.glb",
+    "sha256": "0e15edf58d86dd2065e24997d4da7a71b67c04051a34df8a1243e12464c6d714"
+  }
+}

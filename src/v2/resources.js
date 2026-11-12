@@ -3,11 +3,16 @@ import '@babylonjs/loaders/glTF/2.0/glTFLoader.js';
 import '@babylonjs/loaders/glTF/glTFFileLoader.js';
 import { RESOURCE_MANIFEST } from './resource-manifest.js';
 export { RESOURCE_MANIFEST } from './resource-manifest.js';
-const assetURL=path=>new URL(`${import.meta.env.BASE_URL}${path}`,document.baseURI).href;
+const assetURL=path=>{
+  const url=new URL(`${import.meta.env.BASE_URL}${path}`,document.baseURI);
+  // Pages may cache unchanged filenames between releases (including voices).
+  url.searchParams.set('v',RESOURCE_MANIFEST.version);
+  return url.href;
+};
 
 export async function preloadResources(scene,audio,onProgress) {
-  const assets=new Map(); let completed=0,bytes=0;
-  const total=RESOURCE_MANIFEST.models.length+RESOURCE_MANIFEST.audio.length+1;
+  const assets=new Map(),icons=new Map(); let completed=0,bytes=0;
+  const total=RESOURCE_MANIFEST.models.length+RESOURCE_MANIFEST.audio.length+RESOURCE_MANIFEST.icons.length+1;
   const update=text=>onProgress({progress:++completed/total*.88,text});
   async function read(path) {
     const response=await fetch(assetURL(path));
@@ -18,6 +23,13 @@ export async function preloadResources(scene,audio,onProgress) {
     // A small concurrency limit bounds transient memory and connection pressure.
     const tasks=RESOURCE_MANIFEST.audio.map(item=>async()=>{
       await audio.decode(item.id,await read(item.path));update('把声音装进口袋…');
+    });
+    for(const item of RESOURCE_MANIFEST.icons)tasks.push(async()=>{
+      const blob=new Blob([await read(item.path)],{type:'image/png'}),url=URL.createObjectURL(blob);
+      try{
+        const image=new Image();image.src=url;await image.decode();icons.set(item.id,image);
+      }finally{URL.revokeObjectURL(url);}
+      update('认一认小车和地点…');
     });
     for(const item of RESOURCE_MANIFEST.models)tasks.push(async()=>{
       const container=await LoadAssetContainerAsync(assetURL(item.path),scene);
@@ -32,7 +44,7 @@ export async function preloadResources(scene,audio,onProgress) {
     }));
     const failed=results.find(x=>x.status==='rejected');if(failed)throw failed.reason;
     await document.fonts.ready;update('小镇准备就绪…');
-    return {assets,stats:{version:RESOURCE_MANIFEST.version,count:total,audioBytes:bytes,ready:false},
+    return {assets,icons,stats:{version:RESOURCE_MANIFEST.version,count:total,audioBytes:bytes,icons:icons.size,ready:false},
       async warm(){
         onProgress({progress:.92,text:'给每辆车做出发检查…'});
         for(const container of assets.values()){
@@ -49,7 +61,7 @@ export async function preloadResources(scene,audio,onProgress) {
         await scene.whenReadyAsync();
         onProgress({progress:1,text:'准备好啦！'});
       },
-      dispose(){for(const container of assets.values())container.dispose();}
+      dispose(){for(const container of assets.values())container.dispose();assets.clear();icons.clear();}
     };
   } catch(error) {for(const c of assets.values())c.dispose();throw error;}
 }

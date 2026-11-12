@@ -5,6 +5,7 @@ import { Control } from '@babylonjs/gui/2D/controls/control.js';
 import { Rectangle } from '@babylonjs/gui/2D/controls/rectangle.js';
 import { TextBlock } from '@babylonjs/gui/2D/controls/textBlock.js';
 import { GOODS, VEHICLES, PLACES, THEMES, DIFFICULTIES } from './catalog.js';
+import { MODEL_CATALOG } from './model-catalog.js';
 
 const W = 1180, H = 820;
 const C = { ink: '#264f49', muted: '#687d70', cream: '#fffaf0', mint: '#e2eee3', teal: '#328775', orange: '#ec9b59', yellow: '#f5ce77', line: '#dce7da', white: '#ffffff' };
@@ -23,11 +24,12 @@ function line(ctx, points, color, width = 5) {
   ctx.beginPath(); points.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
 }
 
-/** All pictograms are drawn into Babylon's GUI texture; no images, fonts or requests. */
+/** Model thumbnails and vector symbols share Babylon's one GUI canvas. */
 class ToyIcon extends Control {
-  constructor(kind, tint) { super(`art-${kind}`); this.kind = kind; this.tint = tint || known[kind]?.color || C.teal; this.isHitTestVisible = false; }
+  constructor(kind, tint, image) { super(`art-${kind}`); this.kind = kind; this.tint = tint || known[kind]?.color || C.teal; this.image=image; this.isHitTestVisible = false; }
   _draw(ctx) {
     const m = this._currentMeasure;
+    if(this.image){ctx.drawImage(this.image,m.left,m.top,m.width,m.height);return;}
     ctx.save(); ctx.translate(m.left, m.top); ctx.scale(m.width / 100, m.height / 100);
     const t = this.tint, k = this.kind;
     if (cars[k] || k === 'car') {
@@ -109,6 +111,20 @@ class ClickSparkles extends Control {
   }
 }
 
+class PlaceLinks extends Control {
+  constructor() { super('place-links'); this.isHitTestVisible=false; this.links=[]; }
+  _draw(ctx) {
+    const m=this._currentMeasure;
+    ctx.save();ctx.translate(m.left,m.top);ctx.scale(m.width/860,m.height/H);
+    for(const p of this.links){
+      line(ctx,[[p.x1,p.y1],[p.x2,p.y2]],'#fffaf0',4);
+      line(ctx,[[p.x1,p.y1],[p.x2,p.y2]],'#789e8b',1.5);
+      circle(ctx,p.x2,p.y2,3,'#789e8b');
+    }
+    ctx.restore();
+  }
+}
+
 function position(control, x, y, width, height) {
   control.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
   control.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
@@ -117,7 +133,7 @@ function position(control, x, y, width, height) {
 }
 
 export function createUI(scene, callbacks = {}) {
-  const { onCommand = () => {}, onSpeak = () => {}, onSound = () => {}, onOverview = () => {}, onReducedMotion = () => {}, onNewSession = () => {} } = callbacks;
+  const { onCommand = () => {}, onSpeak = () => {}, onSound = () => {}, onModelPreview = () => {}, onReducedMotion = () => {}, onNewSession = () => {} } = callbacks;
   const WORLD_W = 860, PANEL_W = W - WORLD_W, CARD_W = PANEL_W - 24;
   const texture = AdvancedDynamicTexture.CreateFullscreenUI('town-ui', true, scene);
   texture.useSmallestIdeal = false;
@@ -134,6 +150,11 @@ export function createUI(scene, callbacks = {}) {
   let mode = 'loading', loadingState = { progress: 0, text: '小镇正在准备，请稍等一会儿。' };
   let sound = true, reducedMotion = false, historicalCount = 0, chosenDifficulty = 'easy', lastSignature = '';
   let projected = [], disposed = false, orientationBlocked = false, vehiclePage = 0, markers = new Map();
+  let placeLinks = null;
+  let modelIcons = new Map();
+  let modelCategory = 'vehicle', modelIndex = 0, modelZoom = 1;
+  const selectedModels = () => MODEL_CATALOG.filter(model => model.category === modelCategory);
+  const selectedModel = () => selectedModels()[modelIndex] || selectedModels()[0];
   const buttons = new Map(), armed = new Set();
   const sparkles = new ClickSparkles();
   sparkles.width = '100%'; sparkles.height = '100%'; sparkles.zIndex = 100;
@@ -186,7 +207,7 @@ export function createUI(scene, callbacks = {}) {
     t.textHorizontalAlignment = align === 'center' ? Control.HORIZONTAL_ALIGNMENT_CENTER : Control.HORIZONTAL_ALIGNMENT_LEFT;
     t.isHitTestVisible = false; parent.addControl(t); return t;
   }
-  function icon(parent, kind, x, y, size, tint) { const a = position(new ToyIcon(kind, tint), x, y, size, size); parent.addControl(a); return a; }
+  function icon(parent, kind, x, y, size, tint) { const a = position(new ToyIcon(kind, tint, modelIcons.get(kind)), x, y, size, size); parent.addControl(a); return a; }
   function button(parent, id, label, x, y, w, h, action, options = {}) {
     const b = position(new Button(id), x, y, w, h);
     b.cornerRadius = options.radius ?? 18; b.thickness = options.outline ? 2 : 0;
@@ -233,7 +254,7 @@ export function createUI(scene, callbacks = {}) {
   function setup() {
     cancelPress();
     screen?.dispose();
-    buttons.clear(); markers = new Map(); markersLayer = null;
+    buttons.clear(); markers = new Map(); markersLayer = null; placeLinks = null;
     screen = new Container('ui-screen'); screen.width = '100%'; screen.height = '100%'; screen.zIndex = 1;
     screen.isHitTestVisible = false; texture.addControl(screen);
     frame = new Container('ui-frame'); frame.width = `${W}px`; frame.height = `${H}px`;
@@ -334,11 +355,12 @@ export function createUI(scene, callbacks = {}) {
     markersLayer.isHitTestVisible = false; markersLayer.clipChildren = true;
     frame.addControl(markersLayer);
     markersLayer.isVisible = ['explore', 'delivery'].includes(lastState?.phase) && !lastState.paused && !panel && !orientationBlocked;
+    placeLinks=position(new PlaceLinks(),0,0,WORLD_W,H);markersLayer.addControl(placeLinks);
     for (const place of PLACES) {
       const b = button(markersLayer, `place-${place.id}`, '', 0, 0, 132, 72, () => send('TRAVEL', { placeId: place.id }), { fill: 'transparent', pressedFill: '#dce9d855', radius: 16 });
       const chip = box(b, `sign-${place.id}`, 16, 16, 100, 40, '#fffaf0ed', 13);
       icon(chip, place.id, 3, 6, 28);
-      const shortName = place.name.replace(/小镇|阳光|彩虹|爱心|开心|熊熊|汽车/g, '');
+      const shortName = place.name;
       text(chip, shortName, 32, 0, 66, 40, 21, C.ink, 'center', true);
       b.isVisible = false; markers.set(place.id, b);
     }
@@ -369,14 +391,27 @@ export function createUI(scene, callbacks = {}) {
       let top = Math.max(4, Math.min(H - 76, y - 88));
       const visible = p.visible !== false && x >= 0 && x <= WORLD_W && y >= 0 && y <= H;
       if (visible) {
-        // Try small horizontal shifts first so signs stay above their buildings.
-        for (const shift of [0, -90, 90, -150, 150]) {
-          const candidate = Math.max(4, Math.min(WORLD_W - 136, x - 66 + shift));
-          if (!placed.some(other => Math.abs(other.left - candidate) < 108 && Math.abs(other.top - top) < 44)) { left = candidate; break; }
-        }
-        placed.push({ left, top });
+        // Avoid other signs and building facades; link displaced signs back
+        // to their actual landmarks so their identity remains unambiguous.
+        const candidates=[0,-90,90,-150,150].map(shift=>{
+          const candidate=Math.max(4,Math.min(WORLD_W-136,x-66+shift));
+          let score=Math.abs(candidate-(x-66));
+          for(const other of placed)if(Math.abs(other.left-candidate)<108&&Math.abs(other.top-top)<44)score+=10000;
+          for(const other of projected){
+            if(other.id===p.id||!other.building||other.visible===false)continue;
+            const bx=(other.building.x-worldRect.x)/scale.x,by=(other.building.y-worldRect.y)/scale.y;
+            if(candidate+116>bx-32&&candidate+16<bx+32&&top+56>by-65&&top+16<by+20)score+=1000;
+          }
+          return {left:candidate,score};
+        }).sort((a,b)=>a.score-b.score);
+        left=candidates[0].left;
+        placed.push({left,top,x1:left+66,y1:top+36,x2:x,y2:y});
       }
       b.left = `${Math.round(left)}px`; b.top = `${Math.round(top)}px`; b.isVisible = visible;
+    }
+    if(placeLinks){
+      const key=JSON.stringify(placed.map(p=>[p.x1,p.y1,p.x2,p.y2].map(n=>Math.round(n*10))));
+      if(placeLinks.key!==key){placeLinks.key=key;placeLinks.links=placed;placeLinks._markAsDirty();}
     }
   }
   function drivingHUD() {
@@ -401,20 +436,20 @@ export function createUI(scene, callbacks = {}) {
       s.cargo.slice(0, 6).forEach((item, i) => text(card, `${goods[item.goodId]?.name} ×${item.quantity}`, 12 + (i % 2) * 140, 386 + Math.floor(i / 2) * 44, 132, 40, 22, C.muted));
       if (!s.cargo.length) text(card, '空空的车厢，可以去仓库装东西。', 12, 388, 272, 100, 24, C.muted);
     }
-    button(card, 'overview', '看全镇', 12, 540, 272, 72, () => onOverview(), { icon: 'town', size: 24 });
+    // The camera already shows the whole town after loading and throughout travel.
     helpButton(card);
   }
   function destinations() {
     const card = sidebar({ close: true });
     title(card, '想去哪里？', '选一个地点，小车就会自己开过去。', { subtitleHeight: 68 });
     PLACES.forEach((place, i) => {
-      const b = button(card, `destination-${place.id}`, '', 12 + (i % 2) * 140, 158 + Math.floor(i / 2) * 110, 132, 100, () => {
+      const b = button(card, `destination-${place.id}`, '', 12 + (i % 2) * 140, 144 + Math.floor(i / 2) * 94, 132, 88, () => {
         panel = null;
         if (!priorPaused) send('PAUSE', { value: false });
         send('TRAVEL', { placeId: place.id }); rebuild();
       });
-      icon(b, place.id, 48, 4, 36);
-      text(b, place.name, 4, 42, 124, 54, 23, C.ink, 'center', true);
+      icon(b, place.id, 44, 0, 44);
+      text(b, place.name, 4, 44, 124, 40, 24, C.ink, 'center', true);
     });
     button(card, 'close-hint', '回到小镇', 12, 620, 272, 72, closePanel, { fill: C.teal, ink: C.white });
   }
@@ -445,16 +480,38 @@ export function createUI(scene, callbacks = {}) {
     text(card, '小司机的小设置', 12, 8, 272, 54, 28, C.ink, 'left', true);
     DIFFICULTIES.forEach((d, i) => {
       const selected = chosenDifficulty === d.id;
-      const b = button(card, `difficulty-${d.id}`, '', 12, 64 + i * 96, 272, 88, () => { chosenDifficulty = d.id; rebuild(); }, { fill: selected ? '#cde3cd' : '#e9e9db', outline: selected ? C.teal : null });
+      const b = button(card, `difficulty-${d.id}`, '', 12, 64 + i * 88, 272, 80, () => { chosenDifficulty = d.id; rebuild(); }, { fill: selected ? '#cde3cd' : '#e9e9db', outline: selected ? C.teal : null });
       text(b, d.name, 10, 3, 252, 38, 25, C.ink, 'left', true);
       const description = { easy: '记一种物品和一个地点', normal: '记两种物品和两个地点', challenge: '记三步，按顺序完成' }[d.id];
-      text(b, description, 10, 44, 252, 38, 22, C.muted);
+      text(b, description, 10, 40, 252, 36, 22, C.muted);
     });
-    const soundButton = button(card, 'setting-sound', sound ? '声音：开' : '声音：关', 12, 356, 272, 72, () => { sound = !sound; onSound(sound); rebuild(); }, { icon: 'sound' });
+    const soundButton = button(card, 'setting-sound', sound ? '声音：开' : '声音：关', 12, 336, 272, 64, () => { sound = !sound; onSound(sound); rebuild(); }, { icon: 'sound' });
     buttons.set('sound', soundButton); // Existing test ID now points to the settings action.
-    button(card, 'reduced-motion', reducedMotion ? '轻柔动态：开' : '轻柔动态：关', 12, 436, 272, 72, () => { reducedMotion = !reducedMotion; if (reducedMotion) { sparkles.bursts = []; sparkles._markAsDirty(); } onReducedMotion(reducedMotion); rebuild(); }, { size: 24 });
-    button(card, 'new-session', '用这个难度去新小镇', 12, 516, 272, 72, () => { panel = null; onNewSession(chosenDifficulty); rebuild(); }, { fill: C.teal, ink: C.white, size: 23 });
-    button(card, 'back-to-town', '回到小镇', 12, 620, 272, 72, closePanel, { size: 24 });
+    button(card, 'reduced-motion', reducedMotion ? '轻柔动态：开' : '轻柔动态：关', 12, 408, 272, 64, () => { reducedMotion = !reducedMotion; if (reducedMotion) { sparkles.bursts = []; sparkles._markAsDirty(); } onReducedMotion(reducedMotion); rebuild(); }, { size: 24 });
+    button(card, 'model-viewer', '模型图鉴', 12, 480, 272, 64, () => openPanel('models'), { size: 25 });
+    button(card, 'new-session', '用这个难度去新小镇', 12, 552, 272, 64, () => { panel = null; onNewSession(chosenDifficulty); rebuild(); }, { fill: C.teal, ink: C.white, size: 23 });
+    button(card, 'back-to-town', '回到小镇', 12, 628, 272, 64, closePanel, { size: 24 });
+  }
+  function modelViewer() {
+    const card = sidebar({ close: true }), list = selectedModels(), model = selectedModel();
+    text(card, '模型图鉴', 12, 8, 272, 54, 28, C.ink, 'left', true);
+    [['vehicle','车辆'],['place','地点'],['decoration','装饰']].forEach(([id,label],i)=>{
+      button(card, `models-${id}`, label, 12+i*92, 72, 88, 64, ()=>{
+        modelCategory=id;modelIndex=0;modelZoom=1;rebuild();
+      }, {fill:modelCategory===id?'#cde3cd':C.mint,size:23});
+    });
+    text(card, model.name, 12, 150, 272, 46, 28, C.ink, 'left', true);
+    text(card, `${model.sourceLabel} · ${modelIndex+1}/${list.length}`, 12, 204, 272, 40, 23, C.teal, 'left', true);
+    text(card, model.packLabel, 12, 250, 272, 62, 23, C.muted);
+    text(card, model.details, 12, 316, 272, 94, 22, C.muted);
+    const step = delta => {modelIndex=(modelIndex+delta+list.length)%list.length;modelZoom=1;rebuild();};
+    button(card, 'model-previous', '上一个', 12, 420, 132, 64, ()=>step(-1), {size:23});
+    button(card, 'model-next', '下一个', 152, 420, 132, 64, ()=>step(1), {size:23});
+    const zoom = delta => {modelZoom=Math.max(.65,Math.min(1.6,Math.round((modelZoom+delta)*100)/100));rebuild();};
+    button(card, 'model-zoom-out', '缩小 −', 12, 496, 132, 64, ()=>zoom(-.15), {enabled:modelZoom>.65,size:23});
+    button(card, 'model-zoom-in', '放大 ＋', 152, 496, 132, 64, ()=>zoom(.15), {enabled:modelZoom<1.6,size:23});
+    text(card, `45°斜俯视 · ${Math.round(modelZoom*100)}%`, 12, 572, 272, 40, 22, C.muted, 'center');
+    button(card, 'model-back', '返回设置', 12, 628, 272, 64, ()=>openPanel('settings'), {size:24});
   }
   function landing() {
     const card = sidebar({ utilities: false });
@@ -484,6 +541,7 @@ export function createUI(scene, callbacks = {}) {
   }
   function rebuild() {
     if (disposed) return;
+    onModelPreview(panel === 'models' ? selectedModel().id : null, modelZoom);
     setup();
     if (orientationBlocked) { orientationNotice(); return; }
     const interactiveWorld = mode === 'game' && lastState && ['explore', 'delivery'].includes(lastState.phase) && !lastState.paused && !panel;
@@ -492,6 +550,7 @@ export function createUI(scene, callbacks = {}) {
     makeMarkers();
     if (panel === 'hint') { brief(true); return; }
     if (panel === 'settings') { settings(); return; }
+    if (panel === 'models') { modelViewer(); return; }
     if (panel === 'destinations') { destinations(); return; }
     if (lastState.paused) { paused(); return; }
     if (lastState.phase === 'brief') brief();
@@ -526,6 +585,7 @@ export function createUI(scene, callbacks = {}) {
     },
     loading(info) { mode = 'loading'; loadingState = { ...loadingState, error: false, ...info }; rebuild(); },
     ready() { mode = 'ready'; rebuild(); },
+    setModelIcons(images) { modelIcons = images; rebuild(); },
     setSettings(settings = {}) { sound = settings.sound ?? sound; historicalCount = settings.historicalCount ?? historicalCount; reducedMotion = settings.reducedMotion ?? reducedMotion; if (reducedMotion) { sparkles.bursts = []; sparkles._markAsDirty(); } rebuild(); },
     setPlaces(points) { projected = points || []; applyPlaces(); },
     setOrientationBlocked(blocked) {
@@ -536,8 +596,10 @@ export function createUI(scene, callbacks = {}) {
     cancelInput: cancelPress,
     getBounds,
     getLayout,
+    getModelView() { return panel === 'models' ? {...selectedModel(),zoom:modelZoom} : null; },
     dispose() {
       disposed = true; cancelPress(); scene.onBeforeRenderObservable.remove(tick); engine.onResizeObservable.remove(resizeObserver);
+      modelIcons = new Map();
       canvas?.removeEventListener('pointermove', cancelOutside, true); canvas?.removeEventListener('pointerup', cancelOutside, true);
       canvas?.removeEventListener('pointercancel', cancelPress, true); canvas?.ownerDocument?.removeEventListener('pointerdown', secondPointer, true); canvas?.removeEventListener('lostpointercapture', cancelPress, true);
       texture.dispose();

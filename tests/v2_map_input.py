@@ -39,17 +39,19 @@ async def run():
    else:await p.mouse.click(body['x'],body['y'])
    await phase(p,'moving');assert (await state(p))['currentDestination']=='school'
    await phase(p,'delivery');assert (await state(p))['location']=='school'
-   await click(p,'overview')
+   assert (await snap(p))['world']['camera']['overview']
+   assert 'overview' not in (await snap(p))['bounds']
    await p.wait_for_function('(()=>{const c=window.__townTest.snapshot().world.camera;return c.overview&&Math.abs(c.target.x)<.05&&Math.abs(c.target.z)<.05})()',timeout=60000)
-   x,y=await center(p,'place-cafe')
+   step=(await state(p))['mission']['steps'][0]
+   x,y=await center(p,'place-'+step['placeId'])
    if touch:await p.touchscreen.tap(x,y)
    else:await p.mouse.click(x,y)
-   await phase(p,'moving');assert (await state(p))['currentDestination']=='cafe'
+   await phase(p,'moving');assert (await state(p))['currentDestination']==step['placeId']
    await phase(p,'delivery')
-   for _ in range(2):await click(p,'deliver-flowers')
+   for _ in range(step['quantity']):await click(p,'deliver-'+step['goodId'])
    await phase(p,'reward')
    assert (await state(p))['rewardCount']==1
-   results.append({'viewport':[width,height],'dpr':dpr,'touch':touch,'building':'school','label':'cafe','completed':True})
+   results.append({'viewport':[width,height],'dpr':dpr,'touch':touch,'building':'school','label':step['placeId'],'completed':True})
    print('PASS direct map building + label + delivery',width,height,dpr,touch,flush=True)
    await p.screenshot(path=str(OUT/f'map-input-{width}-{dpr}.png'));await ctx.close()
   assert not errors,errors

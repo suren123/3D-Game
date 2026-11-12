@@ -45,7 +45,8 @@ async def run():
   await click(p,'depart');s=await sidebar_bounds(p)
   assert len([k for k in s['bounds'] if not k.startswith('place-')])<=4,s['bounds']
   await p.screenshot(path=str(OUT/'sidebar-town.png'));checks.append('brief, selection, loading, help and drive controls stay beside scene')
-  await click(p,'place-cafe');await phase(p,'moving')
+  step=(await state(p))['mission']['steps'][0]
+  await click(p,'place-'+step['placeId']);await phase(p,'moving')
   await p.set_viewport_size({'width':820,'height':1180})
   await p.wait_for_function('window.__townTest.snapshot().orientationBlocked&&window.__townTest.snapshot().state.paused')
   frozen=(await snap(p))['world']['position'];await p.wait_for_timeout(600)
@@ -54,7 +55,7 @@ async def run():
   await p.wait_for_function('!window.__townTest.snapshot().orientationBlocked&&!window.__townTest.snapshot().state.paused')
   await phase(p,'delivery');await sidebar_bounds(p)
   await p.screenshot(path=str(OUT/'sidebar-delivery.png'));checks.append('portrait pauses journey; landscape resumes to delivery')
-  for _ in range(2):await click(p,'deliver-flowers')
+  for _ in range(step['quantity']):await click(p,'deliver-'+step['goodId'])
   await phase(p,'reward');await sidebar_bounds(p)
   await click(p,'pause');assert (await state(p))['paused']
   await p.set_viewport_size({'width':820,'height':1180});await p.wait_for_function('window.__townTest.snapshot().orientationBlocked')

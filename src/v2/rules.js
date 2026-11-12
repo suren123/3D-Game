@@ -57,17 +57,25 @@ function nodeRoute(map, start, goal, blockedEdges = []) {
 export function generateMap(seed = 1) {
   seed = clampSeed(seed);
   const random = seededRandom(seed ^ 0x4d4150);
-  const gapX = 8 + Math.floor(random() * 4), gapZ = 8 + Math.floor(random() * 4);
-  const nodes = Array.from({ length: 9 }, (_, i) => ({ id: `n${i}`, x: (i % 3 - 1) * gapX, z: (Math.floor(i / 3) - 1) * gapZ }));
+  const size = 4;
+  const gapX = 8 + Math.floor(random() * 2), gapZ = 8 + Math.floor(random() * 2);
+  const nodes = Array.from({ length: size * size }, (_, i) => ({
+    id: `n${i}`, x: (i % size - 1.5) * gapX, z: (Math.floor(i / size) - 1.5) * gapZ,
+  }));
   let edges = [];
-  for (let i = 0; i < 9; i++) {
-    if (i % 3 < 2) edges.push([`n${i}`, `n${i + 1}`]);
-    if (i < 6) edges.push([`n${i}`, `n${i + 3}`]);
+  for (let i = 0; i < nodes.length; i++) {
+    if (i % size < size - 1) edges.push([`n${i}`, `n${i + 1}`]);
+    if (i < size * (size - 1)) edges.push([`n${i}`, `n${i + size}`]);
   }
-  // Keep cycles for recoverable roadworks, while varying the actual road topology.
-  const removeCount = Math.floor(random() * 3);
+  // A short corner branch gives each town a quiet side road. Keep several loops
+  // in the rest of the grid so roadworks can always close a recoverable segment.
+  const branch = `n${[0, 3, 12, 15][Math.floor(random() * 4)]}`;
+  const branchEdges = edges.filter(edge => edge.includes(branch));
+  const branchExit = branchEdges[Math.floor(random() * branchEdges.length)];
+  edges = edges.filter(edge => edge !== branchExit);
+  const roadCount = 18 + Math.floor(random() * 3);
   for (const candidate of shuffled(edges, random)) {
-    if (edges.length <= 12 - removeCount) break;
+    if (edges.length <= roadCount) break;
     const next = edges.filter(edge => edge !== candidate);
     if (nodes.every(node => nodeRoute({ nodes, edges: next }, nodes[0].id, node.id).length)) edges = next;
   }
@@ -222,7 +230,7 @@ export function createGame({ seed = 1, difficulty = 'easy', saved = {} } = {}) {
       case 'LOAD': {
         if (state.phase !== 'loading' || !state.mission.shelf.includes(command.goodId)) { accepted = false; break; }
         if (state.shortageGoodId === command.goodId && state.location === 'depot') {
-          feedback(events, '这个货架在补货，去汽车工坊的备用箱看看吧。'); break;
+          feedback(events, '这个货架在补货，去车库的备用箱看看吧。'); break;
         }
         if (cargoCount() >= capacity()) { feedback(events, '小车已经坐满啦。可以放回一件，或者先送这一车。'); break; }
         const item = state.cargo.find(item => item.goodId === command.goodId);
@@ -330,8 +338,8 @@ export function createGame({ seed = 1, difficulty = 'easy', saved = {} } = {}) {
         state.eventHistory.push({ id, option });
         state.event = null;
         updateLocationPhase();
-        const message = id === 'shortage' && option === 'pickup' ? '备用箱在汽车工坊，需要补货时去那里。'
-          : id === 'capacity' && option === 'two-trips' ? '其余物品已安全暂存仓库。先送车上这一件，再回小镇仓库点货架取回。'
+        const message = id === 'shortage' && option === 'pickup' ? '备用箱在车库，需要补货时去那里。'
+          : id === 'capacity' && option === 'two-trips' ? '其余物品已安全暂存仓库。先送车上这一件，再回仓库点货架取回。'
           : '想到办法啦，我们继续原来的小任务！';
         feedback(events, message, 'success');
         break;
