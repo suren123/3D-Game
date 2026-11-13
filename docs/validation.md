@@ -140,3 +140,12 @@
 环境为云端Chromium/SwiftShader，主要1180×820；不是iPad Air4真机。实际Safari主屏幕安装、帧率、触摸手感未验证。起步180°原地缓慢调向仍可能车身外摆，不是完整交通碰撞系统。粒子数量与暂停由代码及当前专项检查，不宣称自然天气最终视觉已验收。
 
 环境恢复时曾令旧HTTP服务断连，第一次地图输入跑到部分case后中断。重启本地静态服务，完整重跑三case通过；该中断不伪记为通过，也未更改产品绕过。最终阶段记录位于忽略提交的 `artifacts/goal/qa`，生产bundle在各阶段固定并核对。
+
+
+### 本轮发布与正式站复测
+
+功能提交 `08793fb18094b43ea32e82954701bee0e8e9e540` 已推送 main，[GitHub Actions 43364528037](https://github.com/suren123/3D-Game/actions/runs/43364528037) 构建、最终提交43项Node测试及Pages部署全部成功。正式站 https://suren123.github.io/3D-Game/ HTTP200，实际入口 `assets/index-D2ZvMdG2.js`，与本地验收一致。
+
+`python tests/v2_live.py` 已使用真实线上HTTPS响应验证44模型、19图标、55音频/52中文语音；真实Canvas触摸完成商店配送、驾驶拉近、到站全镇、装卸清理、营地图鉴放大/返回。最终rewardCount=1，页面异常0，ready后无新增游戏资源请求。使用Python系统可信CA转交原始线上响应，没有本地资产替身或关闭TLS校验；不是原生iPad真机。原始结果为忽略提交的 `artifacts/v2/live-mini-verification.json`。
+
+本轮按用户收尾指令结束。恢复工作时段02:29–04:20 UTC约111分钟，加此前约20分钟，累计约131分钟（包含实际浏览器验证及发布等待）。剩余P2和未执行专项保持上文记录，不将其描述成全部完成或商业发行级验收。下一轮优先结合真实iPad试玩反馈改学校辨识、场景细节及起步调向。
