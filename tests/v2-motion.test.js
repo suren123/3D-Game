@@ -47,3 +47,21 @@ test('repeated points and arbitrary node count preserve exact destination',()=>{
   assert.ok(a.done&&b.done);assert.equal(a.x,13.5);assert.equal(a.z,12);assert.equal(a.distance,b.distance);
   const still={...a};advanceRoadMotion(a,0);assert.deepEqual(a,still);
 });
+
+test('three-metre parking boundary legs retain full-radius junction arcs without overlapping interior turns',()=>{
+  for(const points of [
+    [{x:0,z:0},{x:0,z:3},{x:11,z:3}],
+    [{x:0,z:0},{x:0,z:11},{x:3,z:11}],
+    [{x:0,z:0},{x:0,z:3},{x:11,z:3},{x:11,z:14},{x:14,z:14}],
+  ]){
+    const path=buildRoadPath(points);
+    for(const arc of path.segments.filter(s=>s.kind==='arc'))assert.equal(arc.radius,2.5);
+    assert.deepEqual(path.start,points[0]);assert.deepEqual(path.end,points.at(-1));
+    for(const segment of path.segments)assert.ok(segment.length>0);
+    for(const segment of path.segments.slice(1)){
+      const before=sampleRoadPath(path,segment.start-1e-5),after=sampleRoadPath(path,segment.start+1e-5);
+      assert.ok(Math.hypot(before.x-after.x,before.z-after.z)<1e-4);
+      assert.ok(Math.abs(Math.atan2(Math.sin(before.yaw-after.yaw),Math.cos(before.yaw-after.yaw)))<1e-4);
+    }
+  }
+});

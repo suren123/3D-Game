@@ -1,7 +1,7 @@
 {
   "depot": {
-    "model": "models/town-v2/depot.glb",
-    "sha256": "323495098c9f276e775f5a8bc3a1373bbef6b48e08e05a05def248ad9173bddd"
+    "model": "models/kenney-town/depot.glb",
+    "sha256": "f91b12c6ec1048cd956c496f567f13094362ad412cd2b220f975f46f29ff89f1"
   },
   "park": {
     "model": "models/town-v2/park.glb",
@@ -9,31 +9,31 @@
   },
   "school": {
     "model": "models/kenney-landmarks/school.glb",
-    "sha256": "9685b677e0eaf67f5ea160ac6ed40e0bfb3b9e3c071fd9e9af0b2c5e98744cac"
+    "sha256": "18f630a42f51c4a21860d62eb49c500b7614d437788929caf2420f0efa180158"
   },
   "hospital": {
     "model": "models/kenney-landmarks/hospital.glb",
-    "sha256": "ff1c46c6a062b11feb31c6d89e70c51838ab3ff0e9339053d652715066980b1e"
+    "sha256": "3d7aa6e31c6a45412b94e1f32f26b42355c9e9691b5e8ad9a5adced90a1a9908"
   },
   "farm": {
     "model": "models/town-v2/farm.glb",
     "sha256": "5366f9c791af2514efa507f16babeb4afec134936c302b7cd25a7474ef6c6c36"
   },
   "cafe": {
-    "model": "models/town-v2/cafe.glb",
-    "sha256": "3396eb7a6fef9de85b9878de2d5407d63ba3296e71d7ff5c821a0ed009eb5d22"
+    "model": "models/kenney-town/cafe.glb",
+    "sha256": "165702ff35946f1486e6107d060b0a80685463d5080d080bac82fdfdd3cf07a7"
   },
   "garage": {
-    "model": "models/town-v2/garage.glb",
-    "sha256": "ace38db48ecfcb0ba24f7615420a6d68b0cef2496103770feac2a68b1fe93ec2"
+    "model": "models/kenney-town/garage.glb",
+    "sha256": "9cdb25ffdb26d2fcc8261076fe2ad4f2605623f9bae0acda1a002745df5f5d71"
   },
   "shop": {
     "model": "models/kenney-landmarks/shop.glb",
-    "sha256": "99640997ff0ecfa9d567b8763e025fcdec50268a8ea420b1c10298dfff616c43"
+    "sha256": "6102e0a6062bc95f7fbaff480a80df2132e34a75b566210b1b8850fbcfe6ef09"
   },
   "camp": {
     "model": "models/town-v2/camp.glb",
-    "sha256": "37d6d3a1f810a1637d0bcda8debecdac749c5058f94cc47e9bad162462f11a3b"
+    "sha256": "c9bce93a737b5040b3f6c4a4204a19c660d0a2388237a091e988219ae7161510"
   },
   "van": {
     "model": "models/kenney-car/van.glb",
@@ -48,15 +48,31 @@
     "sha256": "426a3e3a2c242c05c889b1445ba02ef95b2c8b7cd6f597e1275ef736a826014b"
   },
   "tanker": {
-    "model": "models/town-v2/tanker.glb",
-    "sha256": "cd12067e0627486dbd256565d0ab0d8620fe7610af07c9abb165bb3182b42a43"
+    "model": "models/kenney-town/tanker.glb",
+    "sha256": "8b81e92ee7851983387e1c1b8fce78eabd0f001d783dcee26b6f593d2e2e95e6"
   },
   "repair": {
     "model": "models/kenney-car/truck-flat.glb",
     "sha256": "4279862f2442e96c6603c514edf50bfb932707545695d8c4747611cd3796cf3b"
   },
   "bus": {
-    "model": "models/town-v2/bus.glb",
-    "sha256": "0e15edf58d86dd2065e24997d4da7a71b67c04051a34df8a1243e12464c6d714"
+    "model": "models/kenney-town/bus.glb",
+    "sha256": "3c912a34da5db2f3d838cb8598d152c86ba43d2f1c3d8214335e943fa9da13a7"
+  },
+  "taxi": {
+    "model": "models/kenney-town/taxi.glb",
+    "sha256": "a16f646d29100f0c9b7d1fb3fb1065c2f3e428a249122075424c0a347be21e23"
+  },
+  "tractor": {
+    "model": "models/kenney-town/tractor.glb",
+    "sha256": "e69485997a5c6baae9c1c4f28679c4da38aefe7fbf146f1974ca33a6cc89c4a9"
+  },
+  "ambulance": {
+    "model": "models/kenney-town/ambulance.glb",
+    "sha256": "6c40f25a52bfc74f0ad96e4bad1eb374edd5b9103f318f25aa4b2f231945e90b"
+  },
+  "police": {
+    "model": "models/kenney-town/police.glb",
+    "sha256": "3a52daabd2dd9a1a8d05a37f6c0b845b97d31807c5177a83c24ac818c2fdd222"
   }
 }

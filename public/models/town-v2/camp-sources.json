@@ -1,0 +1,93 @@
+{
+  "id": "camp",
+  "file": "camp.glb",
+  "distributedSha256": "c9bce93a737b5040b3f6c4a4204a19c660d0a2388237a091e988219ae7161510",
+  "bytes": 173748,
+  "projectBase": {
+    "file": "_sources/camp-base.glb",
+    "sha256": "3b2e52119f0c47a60b2b4ccaa7356e4ed60ddf7d59d571c1f355f758835ef93d"
+  },
+  "sourceLayers": [
+    {
+      "file": "kenney-mini/_sources/nature-kit/tent_smallOpen.glb",
+      "sourceUrl": "https://kenney.nl/assets/nature-kit",
+      "originalLibraryPath": "packs/nature-kit/original/Models/GLTF format/tent_smallOpen.glb",
+      "inputSha256": "d32c3f7a5926de03521a012774316d38e09c27bd6dbae7cefdb01debe003ecdd",
+      "license": "../kenney-mini/nature-kit-License.txt",
+      "licenseId": "CC0-1.0",
+      "translation": [
+        -0.3,
+        0.345,
+        -0.1
+      ],
+      "uniformScale": 4.1,
+      "rotationY": 0.7853981633974483,
+      "materialPolicy": "metallicFactor 1 -> 0 for Nature cloth/wood only; original colors and roughness preserved"
+    },
+    {
+      "file": "kenney-mini/forest-tree.glb",
+      "sourceUrl": "https://kenney.nl/assets/mini-forest",
+      "originalLibraryPath": null,
+      "inputSha256": "894184e98d4acdb80f848f759a52e65b18f6fce1b5a90fcbc8b3061f0b506e85",
+      "license": "../kenney-mini/mini-forest-License.txt",
+      "licenseId": "CC0-1.0",
+      "translation": [
+        1.35,
+        0.14,
+        0.9
+      ],
+      "uniformScale": 0.95,
+      "rotationY": 0,
+      "materialPolicy": "preserved"
+    },
+    {
+      "file": "kenney-mini/forest-tree.glb",
+      "sourceUrl": "https://kenney.nl/assets/mini-forest",
+      "originalLibraryPath": null,
+      "inputSha256": "894184e98d4acdb80f848f759a52e65b18f6fce1b5a90fcbc8b3061f0b506e85",
+      "license": "../kenney-mini/mini-forest-License.txt",
+      "licenseId": "CC0-1.0",
+      "translation": [
+        -1.8,
+        0.14,
+        0.7
+      ],
+      "uniformScale": 0.7,
+      "rotationY": 0,
+      "materialPolicy": "preserved"
+    },
+    {
+      "file": "kenney-mini/forest-flag.glb",
+      "sourceUrl": "https://kenney.nl/assets/mini-forest",
+      "originalLibraryPath": null,
+      "inputSha256": "8e20bf42d372f010cd7565e7f1e7582caae492a8498e366e993b27dd3f501ac9",
+      "license": "../kenney-mini/mini-forest-License.txt",
+      "licenseId": "CC0-1.0",
+      "translation": [
+        1.25,
+        0.14,
+        -0.5
+      ],
+      "uniformScale": 1.75,
+      "rotationY": 0,
+      "materialPolicy": "preserved"
+    },
+    {
+      "file": "kenney-mini/forest-stones.glb",
+      "sourceUrl": "https://kenney.nl/assets/mini-forest",
+      "originalLibraryPath": null,
+      "inputSha256": "844c88c6ade1ef5b3d76a9d60817dd76e9b2c59ca831568bdaa30fe2f3fb2e13",
+      "license": "../kenney-mini/mini-forest-License.txt",
+      "licenseId": "CC0-1.0",
+      "translation": [
+        1.7,
+        0.14,
+        0
+      ],
+      "uniformScale": 0.35,
+      "rotationY": 0,
+      "materialPolicy": "preserved"
+    }
+  ],
+  "modification": "Use open matte Nature tent; separate trees/flag/stones and crate/stools without triangle crossings; all props sit on platform; Mini tent retained historically but not in runtime camp"
+}

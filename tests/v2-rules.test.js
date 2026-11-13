@@ -17,13 +17,17 @@ function assertRoadRoute(map, route, blockedEdges = []) {
   }
 }
 
-function chooseVehicle(game) {
+function chooseVehicle(game, earlyOptionId = 'reserve') {
   game.dispatch({ type: 'ACK_BRIEF' });
   const state = game.getState();
   const suitable = state.mission.vehicleChoices.find(id => state.mission.requiredTags.every(tag => VEHICLES.find(vehicle => vehicle.id === id).supports.includes(tag)));
   assert.ok(suitable, 'each mission offers a suitable vehicle');
   game.dispatch({ type: 'SELECT_VEHICLE', vehicleId: suitable });
-  assert.equal(game.getState().phase, 'loading');
+  if (game.getState().event) {
+    assert.equal(game.getState().event.id, 'shortage', 'only stock shortages happen before loading');
+    if (earlyOptionId) game.dispatch({ type: 'RESOLVE_EVENT', optionId: earlyOptionId });
+  }
+  assert.equal(game.getState().phase, !earlyOptionId && game.getState().event ? 'event' : 'loading');
 }
 
 function loadMission(game) {
@@ -94,8 +98,8 @@ function afterFirstDelivery(seed, difficulty = 'challenge', fullLoad = true) {
   return game;
 }
 
-test('finite content has six vehicles, twelve goods, nine named places, eight task templates, three themes and four events', () => {
-  assert.equal(VEHICLES.length, 6); assert.equal(GOODS.length, 12);
+test('finite content has ten vehicles, twelve goods, nine named places, eight task templates, three themes and four events', () => {
+  assert.equal(VEHICLES.length, 10); assert.equal(GOODS.length, 12);
   assert.equal(PLACES.length, 9); assert.equal(TEMPLATES.length, 8); assert.equal(THEMES.length, 3); assert.equal(EVENTS.length, 4);
   for (const list of [VEHICLES, GOODS, TEMPLATES, PLACES, THEMES, EVENTS]) assert.equal(new Set(list.map(item => item.id)).size, list.length);
   assert.deepEqual(PLACES.map(place => place.name), ['仓库', '公园', '学校', '医院', '农场', '餐厅', '车库', '商店', '营地']);
@@ -118,7 +122,8 @@ test('1000 seeds have connected varying maps, valid missions and fully completab
     assert.equal(map.places.length, 9);
     assert.equal(new Set(map.nodes.map(node => node.x)).size, 4);
     assert.equal(new Set(map.nodes.map(node => node.z)).size, 4);
-    assert.ok(map.nodes.every(node => Math.abs(node.x) <= 13.5 && Math.abs(node.z) <= 13.5), 'a larger grid keeps compact toy-town spacing');
+    assert.ok([10.5, 11].includes(map.layout.spacingX) && [10.5, 11].includes(map.layout.spacingZ), 'authored blocks reserve room for six-metre lots beside 3.75m road tiles');
+    assert.ok(map.nodes.every(node => node.x >= map.layout.bounds.minX && node.x <= map.layout.bounds.maxX && node.z >= map.layout.bounds.minZ && node.z <= map.layout.bounds.maxZ), 'all junctions stay inside the authored town boundary');
     assert.ok(map.edges.length >= 18 && map.edges.length <= 20, 'connected roads retain several loops');
     const degrees = new Map(map.nodes.map(node => [node.id, 0]));
     for (const edge of map.edges) for (const nodeId of edge) degrees.set(nodeId, degrees.get(nodeId) + 1);
@@ -133,7 +138,7 @@ test('1000 seeds have connected varying maps, valid missions and fully completab
     for (const [fromId, toId] of map.edges) {
       const from = map.nodes.find(node => node.id === fromId), to = map.nodes.find(node => node.id === toId);
       const distance = Math.abs(from.x - to.x) + Math.abs(from.z - to.z);
-      assert.ok(distance === 8 || distance === 9, 'roads join adjacent grid nodes');
+      assert.equal(distance, from.x === to.x ? map.layout.spacingZ : map.layout.spacingX, 'roads join adjacent grid nodes at the declared block spacing');
     }
     assert.equal(new Set(map.places.map(place => place.nodeId)).size, PLACES.length);
     for (const place of map.places) {
@@ -141,7 +146,7 @@ test('1000 seeds have connected varying maps, valid missions and fully completab
       assert.deepEqual({ x: place.x, z: place.z }, { x: node.x, z: node.z });
     }
     layouts.add(JSON.stringify({ places: map.places, edges: map.edges }));
-    topologies.add(JSON.stringify(map.edges));
+    topologies.add(JSON.stringify(map.edges.map(edgeKey).sort()));
     themes.add(map.theme);
     for (const from of PLACES) for (const to of PLACES) assert.ok(findRoute(map, from.id, to.id).length, `${seed}: ${from.id} to ${to.id}`);
     for (const difficulty of ['easy', 'normal', 'challenge']) {
@@ -167,7 +172,7 @@ test('1000 seeds have connected varying maps, valid missions and fully completab
     }
   }
   assert.ok(layouts.size > 990);
-  assert.ok(topologies.size > 900, 'towns vary their road network as well as their landmarks');
+  assert.ok(topologies.size >= 250, 'authored districts retain varied canonical road networks within the stricter loop and frontage constraints');
   assert.equal(themes.size, 3); assert.equal(templates.size, 8); assert.equal(events.size, 4); assert.equal(goods.size, 12);
   assert.deepEqual([...destinations].sort(), PLACES.filter(place => place.id !== 'depot').map(place => place.id).sort());
 });
@@ -264,16 +269,16 @@ test('pause, duplicate arrivals/deliveries and invalid commands cannot advance o
   assert.equal(game.getState().round, 1);
 });
 
-test('each event has two valid recovery choices with real state effects and preserves the errand', () => {
+test('each post-delivery event has two valid recovery choices with real state effects and preserves the errand', () => {
   const seeds = new Map();
-  for (let seed = 0; seed < 100 && seeds.size < 4; seed++) {
+  for (let seed = 0; seed < 100 && seeds.size < 3; seed++) {
     const game = createGame({ seed, difficulty: 'challenge' });
     chooseVehicle(game); loadMission(game);
     const step = game.getState().mission.steps[0];
     go(game, step.placeId); game.dispatch({ type: 'DELIVER', goodId: step.goodId });
     if (game.getState().event) seeds.set(game.getState().event.id, seed);
   }
-  assert.equal(seeds.size, 4);
+  assert.equal(seeds.size, 3);
   for (const [id, seed] of seeds) for (let optionIndex = 0; optionIndex < 2; optionIndex++) {
     const game = createGame({ seed, difficulty: 'challenge' });
     chooseVehicle(game); loadMission(game);
@@ -296,7 +301,6 @@ test('each event has two valid recovery choices with real state effects and pres
       for (const from of PLACES) for (const to of PLACES) assert.ok(findRoute(after.map, from.id, to.id, after.blockedEdges).length);
     }
     if (id === 'capacity') assert.equal(after.capacityBonus, optionId === 'trailer' ? 0 : 1 - VEHICLES.find(vehicle => vehicle.id === after.vehicleId).capacity);
-    if (id === 'shortage') assert.equal(after.shortageGoodId === null, optionId === 'reserve');
     if (id === 'repair') assert.equal(after.vehicleHealth, optionId === 'pump' ? 'pumped' : 'serviced');
     finishDeliveries(game, optionIndex);
   }
@@ -352,6 +356,10 @@ test('capacity trailer carries everything while two trips must recover safely st
 test('capacity is replaced by another recoverable event when only one step or one loaded unit remains', () => {
   for (let seed = 0; seed < 100; seed++) {
     const game = afterFirstDelivery(seed, 'normal');
+    if (game.getState().eventHistory.some(event => event.id === 'shortage')) {
+      assert.equal(game.getState().event, null, 'a resolved pre-loading shortage does not create a second event');
+      continue;
+    }
     assert.ok(game.getState().event);
     assert.notEqual(game.getState().event.id, 'capacity');
   }
@@ -412,28 +420,22 @@ test('shortage alternate source remains playable when the workshop is also a mis
   let checked = 0, checkedWorkshopDelivery = 0;
   for (let seed = 0; seed < 1000; seed++) {
     const game = createGame({ seed, difficulty: 'challenge' });
-    chooseVehicle(game);
-    const [first, ...rest] = game.getState().mission.steps;
-    // Deliberately forget everything except the first delivery, then recover.
-    game.dispatch({ type: 'LOAD', goodId: first.goodId });
-    game.dispatch({ type: 'DEPART' });
-    go(game, first.placeId);
-    game.dispatch({ type: 'DELIVER', goodId: first.goodId });
+    chooseVehicle(game, null);
+    const steps = game.getState().mission.steps;
     if (game.getState().event?.id !== 'shortage') continue;
     checked++;
     game.dispatch({ type: 'RESOLVE_EVENT', optionId: 'pickup' });
-    go(game, 'depot');
     const unavailable = game.getState().shortageGoodId;
     game.dispatch({ type: 'LOAD', goodId: unavailable });
     assert.equal(game.getState().cargo.length, 0, 'depot shelf really is unavailable');
     game.dispatch({ type: 'TRAVEL', placeId: 'garage' });
     if (game.getState().phase === 'moving') game.dispatch({ type: 'ARRIVE' });
     assert.equal(game.getState().phase, 'loading');
-    for (const step of rest) game.dispatch({ type: 'LOAD', goodId: step.goodId });
-    assert.equal(game.getState().cargo.length, rest.length, 'alternate source supplies missing cargo');
+    for (const step of steps) game.dispatch({ type: 'LOAD', goodId: step.goodId });
+    assert.equal(game.getState().cargo.length, steps.length, 'alternate source supplies missing cargo');
     game.dispatch({ type: 'DEPART' });
     assert.equal(game.getState().phase, 'delivery', 'leaving workshop shelf exposes delivery, not a dead end');
-    for (const step of rest) {
+    for (const step of steps) {
       if (step.placeId === 'garage') checkedWorkshopDelivery++;
       go(game, step.placeId);
       game.dispatch({ type: 'DELIVER', goodId: step.goodId });

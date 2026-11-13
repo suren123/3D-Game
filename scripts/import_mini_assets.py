@@ -9,6 +9,7 @@ licenses enter the project. Textures are embedded, so there are no new runtime
 image URLs. Download cookies and expiring links are never written or printed.
 """
 import argparse
+import copy
 import hashlib
 import http.cookiejar
 import io
@@ -16,6 +17,7 @@ import json
 import math
 from pathlib import Path
 import re
+import shutil
 import struct
 import urllib.request
 import zipfile
@@ -89,9 +91,15 @@ def import_packs():
     (OUT / 'sources.json').write_text(json.dumps(provenance, ensure_ascii=False, indent=2) + '\n')
 
 
-def append_model(target, binary, filename, position, scale, angle=0):
+def append_model(target, binary, filename, position, scale, angle=0, material_policy=None):
     """Merge GLTF index spaces and preserve original Mini mesh/node transforms."""
     source, blob = read_glb((OUT / filename).read_bytes())
+    if material_policy == 'matte-cloth':
+        # Nature's legacy color-only export encodes even fabric/wood metallic=1.
+        # Its official tent preview is matte; keep colors/roughness, correct only
+        # these three materials on this explicitly identified source layer.
+        for material in source.get('materials', []):
+            material['pbrMetallicRoughness']['metallicFactor'] = 0
     binary += b'\0' * (-len(binary) % 4)
     offset = len(binary)
     binary += blob
@@ -137,6 +145,99 @@ def append_model(target, binary, filename, position, scale, angle=0):
                             'rotation': [0, math.sin(angle / 2), 0, math.cos(angle / 2)]})
 
 
+def extract_camp_base():
+    """Cache only the old project base, never previously appended Kenney props."""
+    path = TOWN / '_sources/camp-base.glb'
+    if path.exists():
+        return path
+    doc, blob = read_glb((TOWN / 'camp.glb').read_bytes())
+    source_mesh = doc['meshes'][next(n['mesh'] for n in doc['nodes'] if n.get('name') == 'camp')]
+    result = {'asset': {'version': '2.0', 'generator': 'extract_camp_base',
+        'copyright': 'Project-authored camp base/crate/stools only'},
+        'scene': 0, 'scenes': [{'nodes': [0]}], 'nodes': [{'name': 'camp', 'mesh': 0}],
+        'meshes': [{'name': 'camp base', 'primitives': []}], 'accessors': [], 'bufferViews': [], 'materials': []}
+    binary = bytearray()
+    for primitive in source_mesh['primitives']:
+        p = copy.deepcopy(primitive)
+        for key, index in list(p['attributes'].items()) + [('indices', p['indices'])]:
+            a = copy.deepcopy(doc['accessors'][index]); view = copy.deepcopy(doc['bufferViews'][a['bufferView']])
+            start = view.get('byteOffset', 0)
+            binary += b'\0' * (-len(binary) % 4)
+            view.update(buffer=0, byteOffset=len(binary))
+            binary += blob[start:start + view['byteLength']]
+            a['bufferView'] = len(result['bufferViews']); result['bufferViews'].append(view)
+            dest = len(result['accessors']); result['accessors'].append(a)
+            if key == 'indices':
+                p['indices'] = dest
+            else:
+                p['attributes'][key] = dest
+        p['material'] = len(result['materials'])
+        result['materials'].append(copy.deepcopy(doc['materials'][primitive['material']]))
+        result['meshes'][0]['primitives'].append(p)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_glb(path, result, binary)
+    return path
+
+
+def compose_camp(library=None):
+    base = extract_camp_base()
+    source = OUT / '_sources/nature-kit/tent_smallOpen.glb'
+    if not source.exists():
+        library = library or Path('/workspace/kenney-3d-library/2026-11-12')
+        original = library / 'packs/nature-kit/original'
+        source.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(original / 'Models/GLTF format/tent_smallOpen.glb', source)
+        shutil.copyfile(original / 'License.txt', OUT / 'nature-kit-License.txt')
+    doc, binary = read_glb(base.read_bytes())
+    # Raise the crate/stools from the underside onto the 14cm platform, then
+    # keep their complete geometry outside the new tent's footprint.
+    for primitive in doc['meshes'][0]['primitives']:
+        name = doc['materials'][primitive['material']]['name']
+        shift = {'brown': (.2, .14, .1), 'cream': (.2, .14, .1), 'bark': (.4, .14, -.3)}.get(name)
+        if not shift:
+            continue
+        accessor = doc['accessors'][primitive['attributes']['POSITION']]
+        view = doc['bufferViews'][accessor['bufferView']]
+        offset = view.get('byteOffset', 0) + accessor.get('byteOffset', 0)
+        stride = view.get('byteStride', 12)
+        for i in range(accessor['count']):
+            point = struct.unpack_from('<fff', binary, offset + i * stride)
+            struct.pack_into('<fff', binary, offset + i * stride, *[point[k] + shift[k] for k in range(3)])
+        for key in ['min', 'max']:
+            accessor[key] = [accessor[key][k] + shift[k] for k in range(3)]
+    layers = [
+        # Face the open gable towards the fixed (+X,-Z) Babylon camera. Its
+        # glTF handedness conversion mirrors X; +45deg here becomes that view.
+        ('_sources/nature-kit/tent_smallOpen.glb', [-.3, .345, -.1], 4.1, math.pi / 4, 'matte-cloth'),
+        ('forest-tree.glb', [1.35, .14, .9], .95, 0, None),
+        ('forest-tree.glb', [-1.80, .14, .7], .70, 0, None),
+        ('forest-flag.glb', [1.25, .14, -.50], 1.75, 0, None),
+        ('forest-stones.glb', [1.7, .14, 0], .35, 0, None),
+    ]
+    records = []
+    for filename, position, scale, angle, policy in layers:
+        append_model(doc, binary, filename, position, scale, angle, policy)
+        path = OUT / filename
+        nature = filename.endswith('tent_smallOpen.glb')
+        records.append({'file': str(path.relative_to(ROOT / 'public/models')),
+            'sourceUrl': 'https://kenney.nl/assets/' + ('nature-kit' if nature else 'mini-forest'),
+            'originalLibraryPath': 'packs/nature-kit/original/Models/GLTF format/tent_smallOpen.glb' if nature else None,
+            'inputSha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+            'license': '../kenney-mini/' + ('nature-kit-License.txt' if nature else 'mini-forest-License.txt'),
+            'licenseId': 'CC0-1.0', 'translation': position, 'uniformScale': scale, 'rotationY': angle,
+            'materialPolicy': 'metallicFactor 1 -> 0 for Nature cloth/wood only; original colors and roughness preserved' if policy else 'preserved'})
+    doc['asset'].update(generator='import_mini_assets.py --rebuild-camp',
+        copyright='Project base/crate/stools; Kenney Nature Kit 2.1 open tent and Mini Forest 1.0 props CC0-1.0')
+    path = TOWN / 'camp.glb'
+    write_glb(path, doc, binary)
+    record = {'id': 'camp', 'file': 'camp.glb', 'distributedSha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+        'bytes': path.stat().st_size, 'projectBase': {'file': '_sources/camp-base.glb',
+            'sha256': hashlib.sha256(base.read_bytes()).hexdigest()}, 'sourceLayers': records,
+        'modification': 'Use open matte Nature tent; separate trees/flag/stones and crate/stools without triangle crossings; all props sit on platform; Mini tent retained historically but not in runtime camp'}
+    (TOWN / 'camp-sources.json').write_text(json.dumps(record, ensure_ascii=False, indent=2) + '\n')
+    print('camp.glb rebuilt from isolated project base and Nature/Mini sources', path.stat().st_size)
+
+
 def compose():
     # Models face the -Z street. Contents sit in front of the rear wall,
     # with an unobstructed opening to keep real miniature goods visible.
@@ -145,15 +246,6 @@ def compose():
             ('shop-shelf-boxes.glb', [-.95, .18, .60], 1.65, 0),
             ('shop-display-fruit.glb', [1.12, .18, -.85], 1.7, 0),
             ('shop-cash-register.glb', [-.75, .18, -1.05], 1.5, 0),
-        ],
-        'camp': [
-            # Mini Forest's entrance faces +Z; turn it toward the -Z street
-            # so the fixed town/viewer camera sees the open tent front.
-            ('forest-tent.glb', [-.45, .14, -.10], 2.0, math.pi),
-            ('forest-tree.glb', [1.12, .14, .95], 1.5, 0),
-            ('forest-tree.glb', [-1.25, .14, 1.0], 1.25, 0),
-            ('forest-flag.glb', [1.25, .14, -.50], 1.75, 0),
-            ('forest-stones.glb', [-1.35, .14, -1.1], .9, 0),
         ],
     }
     for name, props in scenes.items():
@@ -164,14 +256,19 @@ def compose():
         doc['asset']['copyright'] = 'Original town shell; Mini props by Kenney, CC0 1.0'
         write_glb(path, doc, binary)
         print(name + '.glb (with Kenney Mini)', path.stat().st_size, 'bytes')
+    compose_camp()
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--download', action='store_true')
     parser.add_argument('--compose', action='store_true')
+    parser.add_argument('--rebuild-camp', action='store_true', help='Rebuild only camp without regenerating unrelated town models')
+    parser.add_argument('--library', type=Path)
     args = parser.parse_args()
     if args.download:
         import_packs()
     if args.compose:
         compose()
+    elif args.rebuild_camp:
+        compose_camp(args.library)

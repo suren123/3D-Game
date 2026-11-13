@@ -20,6 +20,9 @@ import { GOODS, PLACES } from './catalog.js';
 import { buildRoadPath, createRoadMotion, advanceRoadMotion } from './motion.js';
 import { createModelPreview } from './model-preview.js';
 import { planStreets } from './street-layout.js';
+import { initialParkingPose, planParkingRoute } from './parking-route.js';
+import { TOWN_CATALOG } from './town-assets.js';
+const authoredScales = Object.fromEntries(TOWN_CATALOG.map(item=>[item.id,item.runtimeScale]));
 
 // The world only presents rules state. Models arrive fully parsed in the asset
 // registry; neither this module nor a later map change opens a network request.
@@ -34,9 +37,9 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   scene.activeCamera = camera;
   scene.clearColor = Color4.FromHexString('#f4f3e7ff');
   const ambient = new HemisphericLight('soft-sky', new Vector3(0, 1, 0), scene);
-  ambient.intensity = 1; ambient.diffuse = Color3.FromHexString('#fff8e9'); ambient.groundColor = Color3.FromHexString('#a6b992');
+  ambient.intensity = .8; ambient.diffuse = Color3.FromHexString('#fffdf5'); ambient.groundColor = Color3.FromHexString('#bdc9ac');
   const sun = new DirectionalLight('warm-sun', new Vector3(.5, -1, .6).normalize(), scene);
-  sun.position.set(-24,42,-28); sun.intensity = 2.5; sun.diffuse = Color3.FromHexString('#fff1d9');
+  sun.position.set(-24,42,-28); sun.intensity = 2.5; sun.diffuse = Color3.FromHexString('#fff8ee');
   sun.shadowMinZ=.1; sun.shadowMaxZ=120; sun.shadowOrthoScale=.15;
   const shadows = new ShadowGenerator(2048, sun);
   shadows.usePercentageCloserFiltering=true;
@@ -44,8 +47,8 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   shadows.setDarkness(.18);
   scene.imageProcessingConfiguration.toneMappingEnabled=true;
   scene.imageProcessingConfiguration.toneMappingType=ImageProcessingConfiguration.TONEMAPPING_ACES;
-  scene.imageProcessingConfiguration.exposure = 1.05;
-  scene.imageProcessingConfiguration.contrast = 1;
+  scene.imageProcessingConfiguration.exposure = 1.12;
+  scene.imageProcessingConfiguration.contrast = 1.12;
 
   const materials = new Map();
   function mat(hex, alpha = 1) {
@@ -61,8 +64,11 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   let map = null, state = null, vehicleId = '', cargoKey = '', blockedKey = '', location = 'depot';
   let paused = false, moving = false, motion = null, destination = null;
   let departureTurn = null;
+  let parkingHeading = 0;
   let cargoAnimation = null, cargoFeedback = 0;
   let clock = 0, weatherTime = 0, rainTime = 0, travelDust = 0, overviewMode = true;
+  let boardBounds={minX:-20,maxX:20,minZ:-20,maxZ:20};
+  let parkedVehicleIds=[];
   let mapRadius = 20, targetHalfHeight = 23, currentHalfHeight = 23;
   let worldRect = null;
   let framing = { halfWidth: 23, halfHeight: 23 };
@@ -107,6 +113,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     return decoration(key, p, scale, rotation);
   }
   function buildingPosition(place, index) {
+    if(place.lot)return {...place.lot};
     // Pick an unoccupied diagonal quadrant at the road node. Roads only occupy
     // the cardinal directions, so entrances remain clearly beside the road.
     const dirs = [[-1,-1], [1,-1], [-1,1], [1,1]];
@@ -137,19 +144,25 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   let nextParticle = 0;
   function burst(kind, at = position, count = 12) {
     if (paused || reducedMotion) return;
-    const colors = kind === 'rain' ? ['#b0d9ed'] : kind === 'dust' || kind === 'stop' ? ['#f3e8ca','#fff6df'] : ['#f3c567','#f08f7f','#91c8b0','#a6bcea'];
+    const groundCue=kind==='dust'||kind==='stop';
+    const cargoCue=kind==='cargo';
+    const colors = kind === 'rain' ? ['#b0d9ed'] : groundCue ? ['#f3e8ca','#fff6df'] : cargoCue ? ['#ffe5a0','#d1e8c3'] : ['#f3c567','#f08f7f','#91c8b0','#a6bcea'];
     for (let i=0;i<count;i++) {
       const p = particles.particles[nextParticle++ % particles.nbParticles];
       const rain = kind === 'rain';
-      p.isVisible = true; p.props = { ttl: rain ? 1.7 : .6 + cosmetic() * .7, max: 1.3, rain };
-      p.position.copyFrom(at); p.position.y += rain ? 8 + cosmetic() * 4 : .3;
-      if (rain) { p.position.x += (cosmetic()-.5)*28; p.position.z += (cosmetic()-.5)*28; }
-      const angle = cosmetic()*Math.PI*2, speed = kind === 'dust' ? 1 : 2 + cosmetic()*2;
-      p.velocity.set(Math.cos(angle)*speed, rain ? -9 : kind === 'dust' ? .6 : 3 + cosmetic()*3, Math.sin(angle)*speed);
+      p.isVisible = true; p.props = { ttl: rain ? 1.4 : groundCue ? .3+cosmetic()*.3 : cargoCue ? .45 : .7+cosmetic()*.5, max: 1.3, rain };
+      p.position.copyFrom(at); p.position.y += rain ? 6 + cosmetic() * 3 : cargoCue ? .8 : .15;
+      if (rain) { p.position.x += (cosmetic()-.5)*22; p.position.z += (cosmetic()-.5)*22; }
+      const angle = cosmetic()*Math.PI*2, speed = groundCue ? .55 : cargoCue ? .7 : 1.3+cosmetic()*1.4;
+      p.velocity.set(Math.cos(angle)*speed, rain ? -8 : groundCue ? .45 : cargoCue ? 1.4 : 3+cosmetic()*2, Math.sin(angle)*speed);
       if (rain) p.velocity.x = -.9, p.velocity.z = .3;
-      p.scaling.set(rain ? .045 : .14 + cosmetic()*.12, rain ? .6 : .14 + cosmetic()*.12, rain ? .045 : .14 + cosmetic()*.12);
+      const size = groundCue ? .07 + cosmetic() * .07 : cargoCue ? .09 : .12 + cosmetic() * .1;
+      p.scaling.set(rain ? .035 : size, rain ? .4 : size*.65, rain ? .035 : size);
       p.color = Color4.FromHexString(`${colors[Math.floor(cosmetic()*colors.length)]}ff`);
       p.rotation.set(cosmetic()*3,cosmetic()*3,cosmetic()*3);
+      // Rain streaks follow the common fall direction; celebratory particles
+      // keep their varied tumble instead of making the rain look like confetti.
+      if(rain)p.rotation.set(Math.atan2(-p.velocity.z,-p.velocity.y),0,Math.atan2(p.velocity.x,-p.velocity.y));
     }
   }
 
@@ -166,14 +179,18 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     for (const p of particles.particles) p.isVisible = false, p.props.ttl = 0;
     particles.setParticles(); rainTime = 0; weatherTime = 0;
     const coords = nextMap.nodes.flatMap(n=>[Math.abs(n.x),Math.abs(n.z)]);
-    mapRadius = Math.max(9, ...coords) + 7.4;
+    mapRadius = map.layout?.bounds ? Math.max(...Object.values(map.layout.bounds).map(Math.abs)) : Math.max(9, ...coords) + 7.4;
+    boardBounds=map.layout?.bounds||{minX:-mapRadius,maxX:mapRadius,minZ:-mapRadius,maxZ:mapRadius};
+    const boardX=(boardBounds.minX+boardBounds.maxX)/2,boardZ=(boardBounds.minZ+boardBounds.maxZ)/2;
+    const boardWidth=boardBounds.maxX-boardBounds.minX,boardDepth=boardBounds.maxZ-boardBounds.minZ;
+    mapFocus.set(boardX,.8,boardZ);
     const theme = typeof map.theme === 'object' ? map.theme.id : map.theme;
-    const land = theme === 'farm' ? '#cbd8ae' : theme === 'coast' ? '#c9ddbc' : '#c2d7b4';
-    box('table', [0,-1.45,0], [140,.2,140], '#f4f0e3');
-    const board=box('toy-board', [0,-.85,0], [mapRadius*2+1.4,1.0,mapRadius*2+1.4], '#8caf9d');
+    const land = theme === 'farm' ? '#b3cd91' : theme === 'coast' ? '#afd2a1' : '#a8ce94';
+    box('table', [0,-1.45,0], [400,.2,400], '#f8efdf');
+    const board=box('toy-board', [boardX,-.85,boardZ], [boardWidth+1.4,1.0,boardDepth+1.4], '#8caf9d');
     shadows.addShadowCaster(board);
-    box('sand-island', [0,-.45,0], [mapRadius*2+.7,.3,mapRadius*2+.7], '#eee4cd');
-    box('grass-island', [0,-.20,0], [mapRadius*2,.45,mapRadius*2], land);
+    box('sand-island', [boardX,-.45,boardZ], [boardWidth+.7,.3,boardDepth+.7], '#eee4cd');
+    box('grass-island', [boardX,-.20,boardZ], [boardWidth,.45,boardDepth], land);
     const nodes = new Map(map.nodes.map(n=>[n.id,n]));
     const streetPieces = planStreets(map);
     streetInfo = {tileCount: streetPieces.length, junctionCount: streetPieces.filter(p=>p.kind==='node').length,
@@ -182,49 +199,107 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
       const tile = decoration(piece.id, piece.position, 1, piece.rotation);
       tile.scaling.set(...piece.scale);
     }
+    const pathSegment=(a,b,width=.85,color='#fff0d5')=>{
+      const dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz);
+      if(length<.01)return;
+      const path=box('entrance-walkway',[(a.x+b.x)/2,.09,(a.z+b.z)/2],[width,.07,length+.05],color);
+      path.rotation.y=Math.atan2(dx,dz);
+    };
     map.places.forEach((place,index)=>{
       places.set(place.id,place);
       const p = buildingPosition(place,index); placement.set(place.id,p);
       const meta = PLACES.find(x=>x.id===place.id);
-      box('front-garden',[p.x,.065,p.z],[6,.08,5.6],'#e8e7d4');
-      const building=decoration(place.id,[p.x,.12,p.z],['school','hospital','shop'].includes(place.id)?1:1.24,p.rotation);
-      // A generous hitbox makes both small facade details and roofs tappable.
+      const yardWidth=p.width||6,yardDepth=p.depth||5.6;
+      box('front-garden',[p.x,.065,p.z],[yardWidth,.08,yardDepth],place.id==='farm'?'#dfd4af':'#f5e5c9');
+      const buildingScale=authoredScales[place.id]??({school:1.2,hospital:1.15,shop:1.08}[place.id]??1.24);
+      const building=decoration(place.id,[p.x,.12,p.z],buildingScale,p.rotation);
+      const limits=building.getHierarchyBoundingVectors(true);
+      p.height=limits.max.y;
+      p.modelBounds={min:limits.min.clone(),max:limits.max.clone()};
+      // Path starts at the actual front of the imported model, then meets the
+      // reserved lot walkway. No path crosses a building or ends in bare grass.
+      if(p.walkway?.length){
+        const entry={x:p.entranceX??p.x,z:p.entranceZ??p.z-yardDepth/2};
+        pathSegment({x:p.x,z:limits.min.z-.04},entry);
+        for(let i=1;i<p.walkway.length;i++)pathSegment(p.walkway[i-1],p.walkway[i]);
+      }
       for (const mesh of building.getChildMeshes()) mesh.isPickable = false;
-      const hit=own(MeshBuilder.CreateBox(`hit-${place.id}`,{width:5.7,height:4.8,depth:5.7},scene));
-      hit.position.set(p.x,2,p.z);hit.visibility=0;hit.isPickable=true;hit.metadata={placeId:place.id};
-      const sign=disc('place-badge',place.x+1.9,place.z, .42,meta?.color||'#f4c566',.2);
+      const hit=own(MeshBuilder.CreateBox(`hit-${place.id}`,{width:Math.min(yardWidth,Math.max(4.8,limits.max.x-limits.min.x+.5)),height:Math.max(3.8,p.height+.3),depth:Math.min(yardDepth,Math.max(4.8,limits.max.z-limits.min.z+.5))},scene));
+      hit.position.set(p.x,Math.max(3.8,p.height+.3)/2,p.z);hit.visibility=0;hit.isPickable=true;hit.metadata={placeId:place.id};
+      const sign=disc('place-badge',p.frontageX??place.x+1.9,p.frontageZ??place.z, .33,meta?.color||'#f4c566',.21);
       sign.metadata={placeId:place.id};sign.isPickable=true;
-      decoration('oak',[p.x-2.4,.12,p.z+1.5],2.15);
+      // Trees belong behind the buildings, leaving front doors and moving cars clear.
+      if(yardWidth>6.3&&place.id!=='camp')decoration('oak',[p.x-yardWidth/2+.65,.12,p.z+yardDepth/2-.55],1.35);
     });
-    // Small neighbourhood silhouettes on the outer rim keep the playable
-    // buildings distinct and the centre open for children's route choices.
-    const rim=mapRadius-1.5;
-    for(let i=0;i<14;i++){
-      const side=i%4,t=(Math.floor(i/4)-1.5)*7;
-      const x=side===0?-rim:side===1?rim:t,z=side===2?-rim:side===3?rim:t;
-      if([...placement.values()].some(p=>Math.hypot(p.x-x,p.z-z)<4.5))continue;
+    // Vegetation respects complete lots, road surfaces and entrance paths.
+    // A center-only landmark check allowed rim trees to grow in the north lane.
+    const allLots=[...nextMap.places.map(p=>p.lot).filter(Boolean),...(map.layout?.residentialLots||[]),map.layout?.parkingLot].filter(Boolean);
+    const segmentDistance=(x,z,a,b)=>{
+      const dx=b.x-a.x,dz=b.z-a.z,length2=dx*dx+dz*dz;
+      const t=length2?Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/length2)):0;
+      return Math.hypot(x-a.x-t*dx,z-a.z-t*dz);
+    };
+    const clearOfPaths=(x,z,radius,lot)=>!(lot.walkway||[]).slice(1).some((b,i)=>segmentDistance(x,z,lot.walkway[i],b)<radius+.46);
+    const clearVerge=(x,z,radius)=>
+      x-radius>boardBounds.minX&&x+radius<boardBounds.maxX&&z-radius>boardBounds.minZ&&z+radius<boardBounds.maxZ&&
+      map.edges.every(([a,b])=>segmentDistance(x,z,nodes.get(a),nodes.get(b))>(map.layout?.roadTileWidth||3.75)/2+radius)&&
+      allLots.every(lot=>(Math.abs(x-lot.x)>(lot.width||6)/2+radius||Math.abs(z-lot.z)>(lot.depth||6)/2+radius)&&clearOfPaths(x,z,radius,lot));
+    for(let i=0;i<20;i++){
+      const side=i%4,t=(Math.floor(i/4)-2)*7;
+      const x=side===0?boardBounds.minX+1.1:side===1?boardBounds.maxX-1.1:boardX+t;
+      const z=side===2?boardBounds.minZ+1.1:side===3?boardBounds.maxZ-1.1:boardZ+t;
+      if(!clearVerge(x,z,.9))continue;
       decoration('poplar',[x,.03,z],1.7+cosmetic()*.25,cosmetic()*6.28);
-      if(i%3===0)decoration('hedge',[x+1.7,.03,z+.4],1.3);
+      if(i%3===0&&clearVerge(x+1.7,z+.4,.4))decoration('hedge',[x+1.7,.03,z+.4],1.3);
     }
     const xs=[...new Set(map.nodes.map(n=>n.x))].sort((a,b)=>a-b);
     const zs=[...new Set(map.nodes.map(n=>n.z))].sort((a,b)=>a-b);
     const gardenCenters=[...placement.values()];
-    for(let xi=0;xi<xs.length-1;xi++)for(let zi=0;zi<zs.length-1;zi++){
-      const x=(xs[xi]+xs[xi+1])/2,z=(zs[zi]+zs[zi+1])/2;
-      if([...placement.values()].some(p=>Math.hypot(p.x-x,p.z-z)<5))continue;
-      box('residential-garden',[x,.06,z],[5.5,.08,5.3],'#d9dfc3');
-      decoration(['home-a','home-c','home-f'][(xi+zi)%3],[x,.12,z],3.15,Math.PI);
+    const residentialLots=map.layout?.residentialLots||xs.slice(0,-1).flatMap((v,xi)=>zs.slice(0,-1).map((z,zi)=>({x:(v+xs[xi+1])/2,z:(z+zs[zi+1])/2,width:5.5,depth:5.3})));
+    const homes=['home-g','home-m','home-q','home-k','home-a','home-c','home-f'].filter(id=>lookup(id));
+    residentialLots.forEach((lot,i)=>{
+      const {x,z}=lot;
+      if([...placement.values()].some(p=>Math.hypot(p.x-x,p.z-z)<5))return;
+      box('residential-garden',[x,.06,z],[lot.width||6,.08,lot.depth||6],'#bfd79f');
+      const id=homes[(i+map.seed)%homes.length];
+      const home=decoration(id,[x,.12,z],authoredScales[id]??3.15,0);
+      const limits=home.getHierarchyBoundingVectors(true);
+      if(lot.walkway?.length){
+        pathSegment({x,z:limits.min.z-.02},lot.walkway[0],.65);
+        for(let n=1;n<lot.walkway.length;n++)pathSegment(lot.walkway[n-1],lot.walkway[n],.65);
+      }
       gardenCenters.push({x,z});
-      decoration('planter',[x+1.7,.12,z-2.1],2.4);
-      decoration('oak',[x-2,.12,z+1.4],1.8);
+      const planterSpot=[[2.45,2.45],[-2.45,2.45],[2.45,-2.45],[-2.45,-2.45]].map(([dx,dz])=>({x:x+dx,z:z+dz})).find(p=>
+        (p.x+.4<limits.min.x||p.x-.4>limits.max.x||p.z+.4<limits.min.z||p.z-.4>limits.max.z)&&clearOfPaths(p.x,p.z,.4,lot));
+      if(planterSpot)decoration('planter',[planterSpot.x,.12,planterSpot.z],2);
+      if(i%2===0&&lookup('town-low-fence'))decoration('town-low-fence',[x,.12,z],1.7);
+    });
+    parkedVehicleIds=[];
+    const parking=map.layout?.parkingLot;
+    if(parking){
+      const {x,z}=parking;
+      box('neighbourhood-parking',[x,.065,z],[5.9,.08,5.9],'#c4c9be');
+      const fleet=['taxi','police','van','ambulance','bus'];
+      for(let i=0;i<3;i++){
+        const id=fleet[(i+map.seed)%fleet.length];if(!lookup(id))continue;
+        const px=x+(i-1)*1.9;
+        decoration(id,[px,.12,z+.3],.95,Math.PI);
+        parkedVehicleIds.push(id);
+        for(const side of [-1,1])box('parking-line',[px+side*.87,.12,z+.35],[.055,.02,3.8],'#fff4cf');
+      }
+      if(parking.walkway?.length){
+        for(let i=1;i<parking.walkway.length;i++)pathSegment(parking.walkway[i-1],parking.walkway[i],.85,'#c4c9be');
+      }
+      gardenCenters.push(parking);
     }
     // A few lamps sit outside straight edge midpoints, leaving junctions and
     // the large landmark touch targets clear. No procedural street markings.
     const streetSpots=[];
+    const streetKinds=[['street-lamp',3.2],['street-bench',1.65],['street-flower',1.25],['town-trash',1],['town-road-sign',1]].filter(([id])=>lookup(id));
     const addStreetSpot=(x,z,rotation)=>{
-      if(streetSpots.length>=6||gardenCenters.some(p=>Math.hypot(p.x-x,p.z-z)<3.3)||streetSpots.some(p=>Math.hypot(p.x-x,p.z-z)<3))return false;
-      const kind=streetSpots.length%3;
-      streetDecoration(['street-lamp','street-bench','street-flower'][kind],[x,.06,z],[3.2,1.65,1.25][kind],rotation);
+      if(streetSpots.length>=10||gardenCenters.some(p=>Math.hypot(p.x-x,p.z-z)<3.3)||streetSpots.some(p=>Math.hypot(p.x-x,p.z-z)<3))return false;
+      const [id,scale]=streetKinds[streetSpots.length%streetKinds.length];
+      streetDecoration(id,[x,.06,z],scale,rotation);
       streetSpots.push({x,z});return true;
     };
     map.edges.forEach(([aId,bId], index)=>{
@@ -238,22 +313,38 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     // Exterior verge fallback keeps all three small street models visible when
     // seeded landmarks occupy most inner blocks. These points are beyond every
     // road endpoint and still inside the board; they never narrow a lane.
-    if(streetSpots.length<3){
-      const verge=mapRadius-3;
-      for(const t of [0,-6,6,-11,11])for(const [x,z,rotation]of [[-verge,t,Math.PI/2],[verge,t,-Math.PI/2],[t,-verge,0],[t,verge,Math.PI]]){
-        if(streetSpots.length<3)addStreetSpot(x,z,rotation);
+    if(streetSpots.length<streetKinds.length){
+      for(const t of [0,-6,6,-11,11])for(const [x,z,rotation]of [[boardBounds.minX+2.3,boardZ+t,Math.PI/2],[boardBounds.maxX-2.3,boardZ+t,-Math.PI/2],[boardX+t,boardBounds.minZ+2.3,0],[boardX+t,boardBounds.maxZ-2.3,Math.PI]]){
+        if(streetSpots.length<streetKinds.length)addStreetSpot(x,z,rotation);
       }
     }
+    if(lookup('town-traffic-light')){
+      const junction=map.nodes.find(n=>map.edges.filter(e=>e.includes(n.id)).length>=3&&gardenCenters.every(p=>Math.hypot(p.x-(n.x+2.3),p.z-(n.z-2.3))>3.4));
+      if(junction)streetDecoration('town-traffic-light',[junction.x+2.3,.12,junction.z-2.3],1.15,Math.PI/2);
+    }
     if(theme==='farm'){
-      for(let i=0;i<5;i++){box('crop-bed',[-mapRadius+4,.10,-8+i*1.4],[3,.15,.85],'#b29568');for(let j=0;j<3;j++)decoration('hedge',[-mapRadius+3+j,.18,-8+i*1.4],1.1);}
+      // A cultivated strip outside the occupied town plots; paths and lots stay clear.
+      const fieldX=boardBounds.maxX+1.5;
+      box('field-foundation',[fieldX,-.65,boardZ],[3.1,.75,mapRadius*1.25+.1],'#8caf9d');
+      box('field-border',[fieldX,-.12,boardZ],[3,.3,mapRadius*1.25],'#c9b68b');
+      for(let i=0;i<6;i++){
+        const z=boardZ+(i-2.5)*3.1;
+        box('crop-bed',[fieldX,.06,z],[2.5,.15,1.65],'#aa8764');
+        for(let j=0;j<2;j++)decoration('hedge',[fieldX-.65+j*1.3,.14,z],.8);
+      }
     }else if(theme==='coast'){
-      for(let i=0;i<5;i++)box('wave',[mapRadius+3+i*.8,-1.12,-9+i*4],[2.5,.03,.12],'#e2f1e9');
-      box('pier',[mapRadius-1,-.1,0],[5,.3,2.5],'#c69565');
-      for(let i=0;i<6;i++)box('pier-board',[mapRadius-3+i*.8,.08,0],[.06,.03,2.5],'#efdcb3');
+      // The pier reaches actual water, rather than hanging above the cream table.
+      box('harbour-edge',[boardBounds.maxX+2.25,-.65,boardZ],[5.2,.7,boardDepth+.4],'#8caf9d');
+      box('sea-water',[boardBounds.maxX+2.2,-.23,boardZ],[5,.08,boardDepth],'#83cbd4');
+      box('sand-beach',[boardBounds.maxX+.25,-.12,boardZ],[1.1,.12,boardDepth],'#f1d5a0');
+      for(let i=0;i<8;i++)box('wave',[boardBounds.maxX+2.8+(i%2)*.6,-.18,boardZ+(i-3.5)*5],[1.2,.025,.10],'#d6f1ec');
+      box('pier',[boardBounds.maxX+1,.10,boardZ],[3.5,.22,2.2],'#c69565');
+      for(let i=0;i<5;i++)box('pier-board',[boardBounds.maxX-.4+i*.7,.23,boardZ],[.045,.025,2.2],'#efdcb3');
     }
     const depot=places.get('depot')||map.places[0];
-    position.set(depot?.x||0,.2,depot?.z||0);location=depot?.id||'depot';
-    if(vehicle)vehicle.position.copyFrom(position);
+    const parked=initialParkingPose(map,depot?.id||'depot');
+    position.set(parked.x,.2,parked.z);location=depot?.id||'depot';parkingHeading=parked.yaw;
+    if(vehicle){vehicle.position.copyFrom(position);vehicle.rotation.y=parkingHeading;}
     aim.copyFrom(mapFocus);camera.beta=.92;camera.setTarget(aim);overviewMode=true;
     // Fit the rendered island and building bounds in camera space. The old
     // radius multiplier left large empty corners, especially beside the sidebar.
@@ -309,11 +400,13 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   }
   function setVehicle(id) {
     if(id===vehicleId&&vehicle)return;
+    const heading=vehicle?.rotation.y??parkingHeading;
     clearCargoAnimation();cargoKey='';
     vehicleAsset?.dispose();vehicleAsset=null;
     vehicleId=id||'van';
     vehicleAsset=instantiate(vehicleId,null,[position.x,position.y,position.z],1.16);
     vehicle=vehicleAsset.wrapper;vehicle.name='player-vehicle';
+    vehicle.rotation.y=heading;
     vehicle.setEnabled(!previewId);
   }
   function setModelPreview(id=null,zoom=1){
@@ -341,6 +434,10 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     tanker: {x:.8,y:.7,z:-.35,ground:{x:1.8,y:.22,z:-.35}},
     repair: {x:0,y:.75,z:-.85,ground:{x:0,y:.22,z:-1.9}},
     bus: {x:.72,y:.66,z:.55,ground:{x:1.7,y:.22,z:.55}},
+    taxi: {x:.7,y:.72,z:.1,ground:{x:1.7,y:.22,z:.1}},
+    tractor: {x:0,y:.7,z:-.85,ground:{x:0,y:.22,z:-1.8}},
+    ambulance: {x:0,y:.85,z:-1.25,ground:{x:0,y:.22,z:-2.15}},
+    police: {x:.7,y:.7,z:0,ground:{x:1.7,y:.22,z:0}},
   };
   function clearCargoAnimation(){
     cargoRoot?.dispose(false,false);cargoRoot=null;cargoAnimation=null;cargoFeedback=0;
@@ -385,7 +482,10 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     if(!map||map.seed!==next.map.seed)setMap(next.map);
     if(!vehicle||vehicleId!==next.vehicleId)setVehicle(next.vehicleId||'van');
     if(!moving&&next.location!==location){
-      const p=places.get(next.location);if(p){position.set(p.x,.2,p.z);vehicle.position.copyFrom(position);location=next.location;}
+      const p=places.get(next.location);if(p){
+        const parked=initialParkingPose(map,next.location);
+        position.set(parked.x,.2,parked.z);vehicle.position.copyFrom(position);vehicle.rotation.y=parked.yaw;location=next.location;
+      }
     }
     if(next.phase!=='moving'&&moving){moving=false;motion=null;destination=null;departureTurn=null;}
     const blockSignature = JSON.stringify(next.blockedEdges || []);
@@ -417,17 +517,19 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     }
     if(old?.phase==='loading'&&next.phase==='explore')overview();
     if(old?.phase==='event'&&next.phase!=='event')burst('success',position,14);
-    if(old?.phase!==next.phase&&next.phase==='event')rainTime=4;
   }
   function travel(points, placeId) {
     if(paused||moving||!Array.isArray(points)||!points.length)return;
-    motion=createRoadMotion(buildRoadPath([{x:position.x,z:position.z},...points]));destination=placeId;moving=true;
+    // Logical destinations stay at road nodes; physical stops leave enough
+    // straight approach for the complete car and its next rounded turn.
+    const parkedRoute=planParkingRoute(map,points,{position:{x:position.x,z:position.z},heading:vehicle?.rotation.y||0});
+    motion=createRoadMotion(buildRoadPath(parkedRoute.points));destination=placeId;moving=true;
     const from=vehicle?.rotation.y||0,delta=Math.atan2(Math.sin(motion.yaw-from),Math.cos(motion.yaw-from));
     departureTurn=!reducedMotion&&Math.abs(delta)>.025?{from,delta,time:0,duration:Math.max(.2,Math.abs(delta)/3.8)}:null;
     overviewMode=false;burst('dust',position,10);
   }
   function overview(){overviewMode=true;}
-  function effect(kind){if(kind==='rain'||kind==='weather')rainTime=5;else burst(kind==='start'?'dust':kind,position,kind==='reward'?35:12);}
+  function effect(kind){if(kind==='rain'||kind==='weather')rainTime=5;else burst(kind==='start'?'dust':kind,position,['reward','celebrate'].includes(kind)?32:kind==='cargo'?5:8);}
   function update(dt) {
     dt=Math.min(Math.max(Number(dt)||0,0),.1);
     if(!paused||previewId)fitCamera(dt);
@@ -448,7 +550,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     if(vehicle){vehicle.rotation.x=cargoFeedback;vehicle.rotation.z=-cargoFeedback*.55;}
     const cameraTarget=overviewMode?mapFocus:position;
     aim.copyFrom(Vector3.Lerp(aim,cameraTarget,reducedMotion?1:1-Math.exp(-dt*4)));camera.setTarget(aim);
-    if(weatherTime>35){weatherTime=0;rainTime=4.5;}
+    if(weatherTime>65+(map?.seed%20||0)){weatherTime=0;rainTime=5;}
     if(rainTime>0){rainTime-=dt;if(!reducedMotion&&Math.floor(clock*15)!==Math.floor((clock-dt)*15))burst('rain',aim,3);}
     for(const p of particles.particles){
       if(!p.isVisible)continue;
@@ -467,11 +569,18 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     const viewport=camera.viewport.toGlobal(w,h);
     return map.places.map(place=>{
       const p=placement.get(place.id);
-      const projected=Vector3.Project(new Vector3(p.x,place.id==='park'?1.6:3.7,p.z),Matrix.Identity(),scene.getTransformMatrix(),viewport);
+      const projected=Vector3.Project(new Vector3(p.x,Math.max(1.6,(p.height||3.7)+.2),p.z),Matrix.Identity(),scene.getTransformMatrix(),viewport);
       const building=Vector3.Project(new Vector3(p.x,.8,p.z),Matrix.Identity(),scene.getTransformMatrix(),viewport);
       const x=projected.x/w*rect.width,y=projected.y/h*rect.height;
+      const screenBounds={left:Infinity,right:-Infinity,top:Infinity,bottom:-Infinity};
+      if(p.modelBounds)for(const bx of [p.modelBounds.min.x,p.modelBounds.max.x])for(const by of [p.modelBounds.min.y,p.modelBounds.max.y])for(const bz of [p.modelBounds.min.z,p.modelBounds.max.z]){
+        const q=Vector3.Project(new Vector3(bx,by,bz),Matrix.Identity(),scene.getTransformMatrix(),viewport);
+        const sx=q.x/w*rect.width,sy=q.y/h*rect.height;
+        screenBounds.left=Math.min(screenBounds.left,sx);screenBounds.right=Math.max(screenBounds.right,sx);
+        screenBounds.top=Math.min(screenBounds.top,sy);screenBounds.bottom=Math.max(screenBounds.bottom,sy);
+      }
       const area=worldRect||{x:0,y:0,width:rect.width,height:rect.height};
-      return {id:place.id,x,y,
+      return {id:place.id,x,y,screenBounds,
         building:{x:building.x/w*rect.width,y:building.y/h*rect.height},
         visible:projected.z>=0&&projected.z<=1&&x>=area.x&&x<=area.x+area.width&&y>=area.y&&y<=area.y+area.height};
     });
@@ -507,7 +616,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     cancelInput(){pressed=null;heldPointers.clear();multiPointerGesture=false;},
     setPaused(value){paused=!!value;pressed=null;},
     setReducedMotion(value){reducedMotion=!!value;if(value){for(const p of particles.particles)p.isVisible=false;particles.setParticles();}},
-    getState(){return {streetInfo:{...streetInfo,decorationIds:[...streetInfo.decorationIds],roadModelIds:[...streetInfo.roadModelIds],roadworkModelIds:roadworkInstances.length?['street-fence','street-cone']:[]},position:{x:position.x,y:position.y,z:position.z},moving,location,vehicleId,speed:motion?.speed||0,heading:vehicle?.rotation.y||0,curvature:motion?.curvature||0,cargoAnimation:cargoAnimation?{time:cargoAnimation.time,count:cargoAnimation.items.length}:null,cargoMeshCount:cargoRoot?.getChildMeshes().length||0,meshCount:scene.meshes.length,orphanMeshCount:scene.meshes.filter(m=>m!==particleMesh&&!m.metadata?.modelPreview&&!m.isDescendantOf(mapRoot)&&!m.isDescendantOf(vehicle)).length,particleCount:particles.particles.filter(p=>p.isVisible).length,particleLimit:96,weather:rainTime>0?'rain':'clear',preview:{...modelPreview.getState(),zoom:previewZoom},camera:{overview:overviewMode,halfHeight:currentHalfHeight,target:{x:aim.x,z:aim.z}},theme:map?.theme,landmarks:[...placement].map(([id,p])=>({id,rotation:p.rotation}))};},
+    getState(){return {parkedVehicleIds:[...parkedVehicleIds],streetInfo:{...streetInfo,decorationIds:[...streetInfo.decorationIds],roadModelIds:[...streetInfo.roadModelIds],roadworkModelIds:roadworkInstances.length?['street-fence','street-cone']:[]},position:{x:position.x,y:position.y,z:position.z},moving,location,vehicleId,speed:motion?.speed||0,heading:vehicle?.rotation.y||0,curvature:motion?.curvature||0,cargoAnimation:cargoAnimation?{time:cargoAnimation.time,count:cargoAnimation.items.length}:null,cargoMeshCount:cargoRoot?.getChildMeshes().length||0,meshCount:scene.meshes.length,orphanMeshCount:scene.meshes.filter(m=>m!==particleMesh&&!m.metadata?.modelPreview&&!m.isDescendantOf(mapRoot)&&!m.isDescendantOf(vehicle)).length,particleCount:particles.particles.filter(p=>p.isVisible).length,particleLimit:96,weather:rainTime>0?'rain':'clear',preview:{...modelPreview.getState(),zoom:previewZoom},camera:{overview:overviewMode,halfHeight:currentHalfHeight,target:{x:aim.x,z:aim.z}},theme:map?.theme,landmarks:[...placement].map(([id,p])=>({id,x:p.x,z:p.z,height:p.height,rotation:p.rotation}))};},
     dispose(){
       scene.onPointerObservable.remove(observer);engine.onResizeObservable.remove(resizeObserver);
       canvas?.removeEventListener('pointercancel',cancel);canvas?.removeEventListener('lostpointercapture',cancel);

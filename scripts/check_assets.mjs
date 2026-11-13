@@ -46,9 +46,9 @@ for(const icon of manifest.icons){
 for(const license of ['licenses/babylon-Apache-2.0.txt','models/kenney-car/License.txt','models/kenney-suburban/License.txt','models/kenney-nature/License.txt','models/kenney-mini/mini-shop-License.txt','models/kenney-mini/mini-forest-License.txt','audio/kenney-interface/License.txt'])assert((await stat(new URL(license,root))).size>0);
 // Imported and adapted models retain their source licenses and exact shipped
 // hashes. The full external library is not needed to validate a clean checkout.
-for(const [folder,metadata] of [['kenney-streets','licenses/sources.json'],['kenney-landmarks','sources.json']]){
+for(const [folder,metadata] of [['kenney-streets','licenses/sources.json'],['kenney-landmarks','sources.json'],['kenney-town','sources.json']]){
   const base=new URL(`models/${folder}/`,root);
-  const records=JSON.parse(await readFile(new URL(metadata,base),'utf8'));
+  const records=JSON.parse(await readFile(new URL(metadata,base),'utf8')).map(record=>({...record,file:record.file||path.posix.basename(record.path)}));
   const expected=manifest.models.filter(x=>x.path.startsWith(`models/${folder}/`));
   assert.deepEqual(records.map(x=>x.file).sort(),expected.map(x=>path.posix.basename(x.path)).sort(),`Source records must cover ${folder}`);
   for(const record of records){
@@ -60,6 +60,20 @@ for(const [folder,metadata] of [['kenney-streets','licenses/sources.json'],['ken
       assert(/CC0|Creative Commons Zero/.test(text),`Missing CC0 license: ${folder}/${file}`);
     }
   }
+}
+// Camp combines retained Mini props with the open Nature tent and an isolated
+// project base. Verify these separately; it is not a single original Mini GLB.
+const campBase=new URL('models/town-v2/',root);
+const campSource=JSON.parse(await readFile(new URL('camp-sources.json',campBase),'utf8'));
+assert.equal(manifest.models.find(x=>x.id==='camp').path,'models/town-v2/'+campSource.file);
+const digest=async url=>createHash('sha256').update(await readFile(url)).digest('hex');
+assert.equal(await digest(new URL(campSource.file,campBase)),campSource.distributedSha256,'Stale camp assembly provenance');
+assert.equal(await digest(new URL(campSource.projectBase.file,campBase)),campSource.projectBase.sha256,'Changed isolated camp base');
+for(const source of campSource.sourceLayers){
+  assert.equal(await digest(new URL('models/'+source.file,root)),source.inputSha256,'Changed camp source '+source.file);
+  assert.equal(source.licenseId,'CC0-1.0');
+  assert(source.sourceUrl.startsWith('https://kenney.nl/assets/'));
+  assert(/CC0|Creative Commons Zero/.test(await readFile(new URL(source.license,campBase),'utf8')),'Missing camp source license');
 }
 // Home-screen files must also work when the game is served below /3D-Game/.
 const webapp=JSON.parse(await readFile(new URL('manifest.webmanifest',root),'utf8'));

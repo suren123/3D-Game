@@ -37,7 +37,7 @@ function persist(){
   const s=game.getState();
   try{localStorage.setItem(SAVE_KEY,JSON.stringify({version:2,...settings,difficulty:s.difficulty,rewardCount:s.rewardCount,historicalStickers:saved.historicalStickers||[]}));}catch{}
 }
-function speak(){if(started&&ready&&settings.sound)audio.speak(missionSpeech(game.getState()));}
+function speak(context){if(started&&ready&&settings.sound){const s=game.getState();audio.speak(context==='event'&&s.event?[`event-${s.event.id}`]:missionSpeech(s));}}
 function newSession(difficulty){audio.stop();game.dispatch({type:'NEW_SESSION',seed:randomSeed(),difficulty});}
 function command(intent){
   if(multiPointer||orientationBlocked)return;
@@ -111,7 +111,7 @@ async function boot(){
     if(testMode){instrumentation=new SceneInstrumentation(scene);instrumentation.captureFrameTime=true;}
     new FreeCamera('loading-camera',new Vector3(0,20,-20),scene).setTarget(Vector3.Zero());
     audio=createAudio();audio.setEnabled(settings.sound);
-    ui=createUI(scene,{onCommand:command,onSpeak:()=>{audio.unlock().then(speak).catch(()=>{});},
+    ui=createUI(scene,{onCommand:command,onSpeak:context=>{audio.unlock().then(()=>speak(context)).catch(()=>{});},
       onSound:value=>{settings.sound=value;audio.setEnabled(value);persist();ui.setSettings(settings);},
       onModelPreview:(id,zoom)=>world?.setModelPreview(id,zoom),
       onReducedMotion:value=>{settings.reducedMotion=value;world?.setReducedMotion?.(value);ui.setSettings(settings);persist();},
@@ -123,7 +123,6 @@ async function boot(){
       if(document.hidden)return;
       world?.setLayout?.(ui?.getLayout?.().worldRect);
       world?.update(dt);
-      if(world?.projectPlaces)ui.setPlaces?.(world.projectPlaces());
       scene.render();frameCount++;
       if(testMode&&ready){renderSamples.push(engine.getDeltaTime());if(renderSamples.length>120)renderSamples.shift();}
     });

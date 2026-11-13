@@ -23,12 +23,12 @@
     "file": "street-road-corner.glb",
     "sourceUrl": "https://kenney.nl/assets/city-kit-roads",
     "pack": "city-kit-roads",
-    "originalPath": "packs/city-kit-roads/original/Models/GLB format/road-bend-square.glb",
+    "originalPath": "packs/city-kit-roads/original/Models/GLB format/road-bend.glb",
     "license": "licenses/city-kit-roads-License.txt",
     "licenseId": "CC0-1.0",
-    "originalSha256": "5864b49931091625ad5249f34b9f1ac4614170b8a3569494a003d4ec0d47907d",
-    "distributedSha256": "6a7f6912246b49cd4f4be909e08cb0f32225804d6dae097c0412375dc210be42",
-    "bytes": 17752,
+    "originalSha256": "9752f63448c8e7a3d30ca2e0e1bb6784c5adb72b56a2b05667be8d546c1674bc",
+    "distributedSha256": "861c6b492d2e837f98d198cfb32010873460b5bea0a00dd96b1d746b3a5bddd4",
+    "bytes": 31648,
     "textureDependencies": [
       {
         "originalPath": "packs/city-kit-roads/original/Models/GLB format/Textures/colormap.png",

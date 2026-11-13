@@ -4,25 +4,25 @@
 
 **试玩：https://suren123.github.io/3D-Game/**
 
-当前版本保留暖色玩具小镇画风、右侧独立操作区与[iPad 主屏幕启动适配](docs/ipad-installation.md)，使用 Kenney 道路与街边设施、学校/医院/商店改造样板和 Mini 营地，保留模型实物图标、4×4 街区、平滑行驶和短装卸动画。
+当前版本采用有约束的随机街区、10种车辆和44个运行模型，保留暖色玩具小镇画风、右侧独立操作区与[iPad 主屏幕启动适配](docs/ipad-installation.md)，使用 Kenney 道路与街边设施、学校/医院/商店改造样板和 Kenney 组合营地，保留模型实物图标、4×4 街区、平滑行驶和短装卸动画。
 
 ## V2 玩法
 
-- 6 种车辆、12 种物品、8 类随机委托、9 个两字命名地点；晴天小镇、田园、海边 3 种主题。
-- 4×4 街区包含环路与支路；每局 3 单，同局地点固定，下一局重新生成地图、道路与任务。
+- 10 种车辆、12 种物品、8 类随机委托、9 个两字命名地点；晴天小镇、田园、海边 3 种主题。
+- 4×4 街区采用 3 类有约束布局模板，包含环路、支路、9 处任务地块、4 处住宅和停车区域；每局 3 单，同局地点固定，下一局重新生成地图、道路与任务。
 - 轻松：记住 1 种物品与 1 个地点；记忆：2 种物品和 2 个地点；挑战：最多 3 个有序步骤。
 - 先看图听任务，主动点“记住了”；随后自主选车、装货、选地点、交货。“再看 / 再听”随时免费，没有倒计时、扣分或生命值。
-- 入门没有突发事件；其他难度每局最多一次修路、补货、载量变化或轮胎维修。可以绕行、找备用货架、分趟取货、打气或求助。
-- 全 Canvas 界面：左侧小镇、右侧任务/装货/交货面板；装好出发自动展示全镇，驾驶只保留设置、暂停和帮助，六辆候选车可分页选择。
+- 入门没有突发事件；其他难度每局最多一次修路、补货、载量变化或轮胎维修。可以绕行、找备用货架、分趟取货、打气或求助。补货事件在首次装货前出现，已装物品不会凭空消失。
+- 全 Canvas 界面：左侧小镇无常驻文字遮挡，右侧九宫格显示大模型图与地点名，点建筑或图卡直接出发；装好出发自动展示全镇，驾驶镜头平滑拉近跟随，到站返回全镇，候选车可分页选择。
 - [Kenney 官方预览与场景对照](docs/kenney-visual-reference.md)：现成道路、街边设施，以及商店/医院/学校改造样板。
-- [设置 → 模型图鉴](docs/model-library.md)：查看32个资源模型，区分Kenney、自建与组合来源；固定45°斜俯视、大按钮缩放，退出保留游戏进度。
+- [设置 → 模型图鉴](docs/model-library.md)：查看44个资源模型，区分Kenney、自建与组合来源；固定45°斜俯视、大按钮缩放，退出保留游戏进度。
 - 主屏幕独立窗口声明、本地图标和安全区适配；竖屏提示横置并暂停，横屏恢复。Safari无法保证网页强制锁定方向。
 
 这些机制提供记忆与调整策略的练习机会，不等于已验证的认知训练效果。趣味性、难度和操作手感仍需要儿童实际试玩反馈。
 
 ## 加载与性能
 
-Babylon.js 9.35.0 + 官方 GUI。模型、纹理、15 张实物模型图标、48 段本地中文语音、3 个音效与引擎代码在开始前加载，声音完成解码、材质完成预热；游玩中不调用在线 TTS、CDN 或远程字体。**本次打开加载完成后可断网继续玩和换地图**；没有承诺关闭页面后离线重开，当前没有 Service Worker。
+Babylon.js 9.35.0 + 官方 GUI。模型、纹理、19 张实物模型图标、52 段本地中文语音、3 个音效与引擎代码在开始前加载，声音完成解码、材质完成预热；游玩中不调用在线 TTS、CDN 或远程字体。**本次打开加载完成后可断网继续玩和换地图**；没有承诺关闭页面后离线重开，当前没有 Service Worker。
 
 本次视觉样板加入 Kenney 住宅与植被、PBR 材质及实时柔和阴影，同时保留地图点击修复。用户要求先确认画面，再继续性能优化。保留有上限的粒子池，渲染像素比上限 1.25，最高 30 FPS。真实 iPad Air 4 / Safari 和用户电脑的帧率仍需实测，云端软件渲染不能替代真机验收。
 
@@ -57,6 +57,8 @@ python tests/v2_model_viewer.py
 ```bash
 node scripts/generate_models.mjs
 python scripts/compose_kenney_landmarks.py
+python scripts/import_kenney_town.py
+python scripts/import_mini_assets.py --rebuild-camp
 # 另开 Vite 服务在 5174 后，重烘焙车辆与地标图标
 TOWN_DEV_URL=http://127.0.0.1:5174/ python scripts/bake_model_icons.py
 /workspace/tools/edge-tts/.venv/bin/python scripts/generate_voice_v2.py
@@ -72,6 +74,8 @@ TOWN_DEV_URL=http://127.0.0.1:5174/ python scripts/bake_model_icons.py
 - [协作规范](AGENTS.md) / [Agent 使用说明](docs/agent-setup.md)
 - [多 Agent Skill](.agents/skills/multi-agent-dev/SKILL.md) / [游戏开发 Skill](.agents/skills/game-development/SKILL.md)
 - [玩法设计](docs/game-design.md) / [需求](docs/requirements.md) / [选型](docs/technology-selection.md)
+- [本轮道路与界面画面对照](docs/town-quality-review.md) / [组合模型复查](docs/model-quality-review.md)
+- [地图布局与约束](docs/town-layout.md) / [新增 Kenney 资源](docs/kenney-town-assets.md)
 - [模块合同](docs/v2-contract.md) / [资源许可](docs/assets-and-licenses.md)
 - [验证记录](docs/validation.md) / [任务状态](docs/task-state.md)
 

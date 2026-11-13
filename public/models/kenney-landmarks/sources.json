@@ -50,8 +50,8 @@
         2.6789999663829804
       ]
     },
-    "bytes": 172300,
-    "distributedSha256": "9685b677e0eaf67f5ea160ac6ed40e0bfb3b9e3c071fd9e9af0b2c5e98744cac"
+    "bytes": 172284,
+    "distributedSha256": "18f630a42f51c4a21860d62eb49c500b7614d437788929caf2420f0efa180158"
   },
   {
     "file": "hospital.glb",
@@ -80,7 +80,7 @@
       },
       {
         "layer": "Project additions",
-        "description": "Large coral medical cross on cream roof placard and small coral entrance canopy"
+        "description": "Medical cross on plaque seated above parapet; support sampled against actual roof; original doorway unobstructed"
       },
       {
         "layer": "Distribution",
@@ -91,21 +91,21 @@
       "min": [
         -1.457920029759407,
         0.0,
-        -1.8892501258850096
+        -1.7985001534223555
       ],
       "max": [
         1.457920029759407,
-        4.04,
-        1.8892501258850096
+        4.0600000000000005,
+        1.7985001534223555
       ],
       "size": [
         2.915840059518814,
-        4.04,
-        3.7785002517700192
+        4.0600000000000005,
+        3.597000306844711
       ]
     },
-    "bytes": 121192,
-    "distributedSha256": "ff1c46c6a062b11feb31c6d89e70c51838ab3ff0e9339053d652715066980b1e"
+    "bytes": 119756,
+    "distributedSha256": "3d7aa6e31c6a45412b94e1f32f26b42355c9e9691b5e8ad9a5adced90a1a9908"
   },
   {
     "file": "shop.glb",
@@ -170,6 +170,6 @@
       ]
     },
     "bytes": 250376,
-    "distributedSha256": "99640997ff0ecfa9d567b8763e025fcdec50268a8ea420b1c10298dfff616c43"
+    "distributedSha256": "6102e0a6062bc95f7fbaff480a80df2132e34a75b566210b1b8850fbcfe6ef09"
   }
 ]

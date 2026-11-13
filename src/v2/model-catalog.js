@@ -1,12 +1,13 @@
 // Display-only descriptions of the finite, preloaded model collection.
 // Official URLs are source text; the viewer does not navigate or fetch them.
 import { STREET_CATALOG } from './street-assets.js';
+import { TOWN_CATALOG } from './town-assets.js';
 const car = { sourceType: 'kenney', sourceLabel: 'Kenney素材', packLabel: 'Car Kit 3.1', sourceUrl: 'https://kenney.nl/assets/car-kit' };
 const original = { sourceType: 'original', sourceLabel: '项目自建', packLabel: '小镇原创模型', sourceUrl: '' };
 const suburban = { sourceType: 'kenney', sourceLabel: 'Kenney素材', packLabel: 'City Kit Suburban 2.0', sourceUrl: 'https://kenney.nl/assets/city-kit-suburban' };
 const nature = { sourceType: 'kenney', sourceLabel: 'Kenney素材', packLabel: 'Nature Kit 2.1', sourceUrl: 'https://kenney.nl/assets/nature-kit' };
 
-export const MODEL_CATALOG = Object.freeze([
+export const MODEL_CATALOG = Object.freeze([...new Map([
   { id: 'van', name: '小货车', category: 'vehicle', ...car, details: 'Kenney原始厢式车，保留原模型和配色。' },
   { id: 'truck', name: '大卡车', category: 'vehicle', ...car, details: 'Kenney原始货车，保留原模型和配色。' },
   { id: 'fridge', name: '冷藏车', category: 'vehicle', ...car, details: '选用Kenney原始配送车作为冷藏车。' },
@@ -20,8 +21,8 @@ export const MODEL_CATALOG = Object.freeze([
   { id: 'farm', name: '农场', category: 'place', ...original, details: '项目自建谷仓、交叉门板与种植区。' },
   { id: 'cafe', name: '餐厅', category: 'place', ...original, details: '项目自建条纹雨棚与屋顶大杯子。' },
   { id: 'garage', name: '车库', category: 'place', ...original, details: '项目自建卷帘门、扳手标记与车位。' },
-  { id: 'shop', name: '商店', category: 'place', sourceType: 'combined', sourceLabel: '组合模型', packLabel: 'City Kit Commercial 2.1', sourceUrl: 'https://kenney.nl/assets/city-kit-commercial', details: 'Kenney商业楼与入口雨篷，增加项目制作的购物篮标识。' },
-  { id: 'camp', name: '营地', category: 'place', sourceType: 'combined', sourceLabel: '组合模型', packLabel: 'Mini Forest 1.0', sourceUrl: 'https://kenney.nl/assets/mini-forest', details: '自建地台与木箱，组合Kenney帐篷、松树、旗和石头。' },
+  { id: 'shop', name: '商店', category: 'place', sourceType: 'combined', sourceLabel: '组合模型', packLabel: 'City Kit Commercial 2.1', sourceUrl: 'https://kenney.nl/assets/city-kit-commercial', details: 'Kenney商业楼加购物篮标识，保留原有绿雨篷。' },
+  { id: 'camp', name: '营地', category: 'place', sourceType: 'combined', sourceLabel: '组合模型', packLabel: 'Nature Kit 2.1 + Mini Forest 1.0', sourceUrl: 'https://kenney.nl/assets/nature-kit', sourceUrls: ['https://kenney.nl/assets/nature-kit','https://kenney.nl/assets/mini-forest'], details: 'Kenney敞口帐篷、松树与旗，搭配自建地台和木箱。' },
   { id: 'home-a', name: '住宅甲', category: 'decoration', ...suburban, details: 'Kenney原始住宅building-type-a。' },
   { id: 'home-c', name: '住宅乙', category: 'decoration', ...suburban, details: 'Kenney原始住宅building-type-c。' },
   { id: 'home-f', name: '住宅丙', category: 'decoration', ...suburban, details: 'Kenney原始住宅building-type-f。' },
@@ -29,5 +30,5 @@ export const MODEL_CATALOG = Object.freeze([
   { id: 'oak', name: '橡树', category: 'decoration', ...nature, details: 'Kenney原始橡树tree_oak。' },
   { id: 'poplar', name: '高树', category: 'decoration', ...nature, details: 'Kenney原始树木tree_default。' },
   { id: 'hedge', name: '树篱', category: 'decoration', ...nature, details: 'Kenney原始灌木plant_bush。' },
-  ...STREET_CATALOG,
-].map(item => Object.freeze(item)));
+  ...STREET_CATALOG, ...TOWN_CATALOG,
+].map(item=>[item.id,item])).values()].map(item => Object.freeze(item)));

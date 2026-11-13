@@ -20,9 +20,13 @@ export const VEHICLES = freeze([
   { id: 'van', name: '小货车', icon: '🚐', color: '#f4c566', capacity: 3, model: 'van', supports: ['cargo'] },
   { id: 'truck', name: '大卡车', icon: '🚚', color: '#e98b70', capacity: 6, model: 'truck', supports: ['cargo'] },
   { id: 'fridge', name: '冷藏车', icon: '🚛', color: '#9bcfe0', capacity: 4, model: 'fridge', supports: ['cargo', 'cold'] },
-  { id: 'tanker', name: '洒水车', icon: '🚒', color: '#8bc8b2', capacity: 4, model: 'tanker', supports: ['cargo', 'water'] },
+  { id: 'tanker', name: '消防车', icon: '🚒', color: '#e77c54', capacity: 4, model: 'tanker', supports: ['cargo', 'water'] },
   { id: 'repair', name: '维修车', icon: '🛻', color: '#e8ad72', capacity: 4, model: 'repair', supports: ['cargo', 'tools'] },
-  { id: 'bus', name: '小巴士', icon: '🚌', color: '#c5ace2', capacity: 4, model: 'bus', supports: ['cargo', 'passenger'] },
+  { id: 'bus', name: '接送车', icon: '🚙', color: '#e4c25e', capacity: 4, model: 'bus', supports: ['cargo', 'passenger'] },
+  { id: 'taxi', name: '出租车', icon: '🚕', color: '#f3c65d', capacity: 3, model: 'taxi', supports: ['cargo', 'passenger'] },
+  { id: 'tractor', name: '拖拉机', icon: '🚜', color: '#e3c26c', capacity: 4, model: 'tractor', supports: ['cargo', 'tools', 'water'] },
+  { id: 'ambulance', name: '救护车', icon: '🚑', color: '#e8977f', capacity: 3, model: 'ambulance', supports: ['cargo', 'passenger'] },
+  { id: 'police', name: '巡逻车', icon: '🚓', color: '#9cbacf', capacity: 3, model: 'police', supports: ['cargo', 'tools'] },
 ]);
 
 export const PLACES = freeze([
@@ -54,8 +58,8 @@ export const TEMPLATES = freeze([
   { id: 'garden', name: '花园帮手', title: '让花园更漂亮', goods: ['flowers', 'seeds', 'water'], places: ['farm', 'park'] },
   { id: 'school', name: '开学礼物', title: '送去快乐学习包', goods: ['book', 'ball', 'parcel'], places: ['school', 'park'] },
   { id: 'care', name: '爱心补给', title: '给邻居送一份关心', goods: ['milk', 'flowers', 'bread', 'apple'], places: ['hospital', 'cafe'] },
-  { id: 'repair', name: '车库帮忙', title: '一起照顾小汽车', goods: ['tools', 'parcel', 'book'], places: ['garage', 'farm'] },
-  { id: 'shuttle', name: '快乐出游', title: '和朋友一起出发', goods: ['passenger', 'ball', 'book'], places: ['school', 'park'] },
+  { id: 'repair', name: '车库帮忙', title: '一起照顾小汽车', goods: ['tools', 'parcel', 'book'], requiredGood: 'tools', places: ['garage', 'farm'] },
+  { id: 'shuttle', name: '快乐出游', title: '和朋友一起出发', goods: ['passenger', 'ball', 'book'], requiredGood: 'passenger', places: ['school', 'park'] },
   { id: 'restock', name: '商店补货', title: '帮商店和餐厅补满货架', goods: ['bread', 'apple', 'milk', 'parcel'], places: ['shop', 'cafe'] },
   { id: 'camping', name: '营地补给', title: '给营地和公园送去物资', goods: ['water', 'bread', 'parcel', 'seeds'], places: ['camp', 'park'] },
 ]);

@@ -1,0 +1,817 @@
+[
+  {
+    "id": "taxi",
+    "path": "models/kenney-town/taxi.glb",
+    "sourceLayers": [
+      {
+        "pack": "car-kit",
+        "sourceUrl": "https://kenney.nl/assets/car-kit",
+        "originalLibraryPath": "packs/car-kit/original/Models/GLB format/taxi.glb",
+        "offlineInput": "_sources/car-kit/taxi.glb",
+        "originalSha256": "3803539718ffd3b84b515dbce8ed6b489f1ff5be58edb1903d2c5db5c584bdc7",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/car-kit/Textures/colormap.png",
+            "sha256": "f3622a03a20c6696065cae9cbe391351be873508af190c2ebd1d420c055787a5"
+          }
+        ],
+        "license": "licenses/car-kit-License.txt",
+        "licenseSha256": "c33b7f6453d134deae7b1b8493717d9ccfa754c25ab97f6de89b88f8fda19b00",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "distributedSha256": "a16f646d29100f0c9b7d1fb3fb1065c2f3e428a249122075424c0a347be21e23",
+    "bytes": 188352,
+    "bounds": {
+      "min": [
+        -0.75,
+        0.0,
+        -1.3749998807907104
+      ],
+      "max": [
+        0.75,
+        1.4999999165534974,
+        1.3749998807907104
+      ],
+      "size": [
+        1.5,
+        1.4999999165534974,
+        2.749999761581421
+      ]
+    },
+    "runtimeScale": 1.16,
+    "sourceUniformScale": 1,
+    "sourceOrientationPreserved": true,
+    "front": "+Z",
+    "groundY": 0,
+    "modification": "Original geometry, materials, UVs and texture pixels preserved; source PNGs embedded; wrapper scale/centering/grounding"
+  },
+  {
+    "id": "tractor",
+    "path": "models/kenney-town/tractor.glb",
+    "sourceLayers": [
+      {
+        "pack": "car-kit",
+        "sourceUrl": "https://kenney.nl/assets/car-kit",
+        "originalLibraryPath": "packs/car-kit/original/Models/GLB format/tractor.glb",
+        "offlineInput": "_sources/car-kit/tractor.glb",
+        "originalSha256": "48b30b3e4bb0adb48378c473dc27ee5ae4d9296ec758c85816f17121a3ce8371",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/car-kit/Textures/colormap.png",
+            "sha256": "f3622a03a20c6696065cae9cbe391351be873508af190c2ebd1d420c055787a5"
+          }
+        ],
+        "license": "licenses/car-kit-License.txt",
+        "licenseSha256": "c33b7f6453d134deae7b1b8493717d9ccfa754c25ab97f6de89b88f8fda19b00",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "distributedSha256": "e69485997a5c6baae9c1c4f28679c4da38aefe7fbf146f1974ca33a6cc89c4a9",
+    "bytes": 188708,
+    "bounds": {
+      "min": [
+        -0.6710385384544068,
+        0.0,
+        -1.100776281015915
+      ],
+      "max": [
+        0.6710385384544068,
+        1.6020531950205994,
+        1.100776281015915
+      ],
+      "size": [
+        1.3420770769088135,
+        1.6020531950205994,
+        2.20155256203183
+      ]
+    },
+    "runtimeScale": 1.16,
+    "sourceUniformScale": 1,
+    "sourceOrientationPreserved": true,
+    "front": "+Z",
+    "groundY": 0,
+    "modification": "Original geometry, materials, UVs and texture pixels preserved; source PNGs embedded; wrapper scale/centering/grounding"
+  },
+  {
+    "id": "ambulance",
+    "path": "models/kenney-town/ambulance.glb",
+    "sourceLayers": [
+      {
+        "pack": "car-kit",
+        "sourceUrl": "https://kenney.nl/assets/car-kit",
+        "originalLibraryPath": "packs/car-kit/original/Models/GLB format/ambulance.glb",
+        "offlineInput": "_sources/car-kit/ambulance.glb",
+        "originalSha256": "9e429e2b6202c0d78d0c38b2adbaae6b77716bb2a0f6fbb2811556e1fb31edba",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/car-kit/Textures/colormap.png",
+            "sha256": "f3622a03a20c6696065cae9cbe391351be873508af190c2ebd1d420c055787a5"
+          }
+        ],
+        "license": "licenses/car-kit-License.txt",
+        "licenseSha256": "c33b7f6453d134deae7b1b8493717d9ccfa754c25ab97f6de89b88f8fda19b00",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "distributedSha256": "6c40f25a52bfc74f0ad96e4bad1eb374edd5b9103f318f25aa4b2f231945e90b",
+    "bytes": 246388,
+    "bounds": {
+      "min": [
+        -0.75,
+        0.0,
+        -1.6249998807907104
+      ],
+      "max": [
+        0.75,
+        1.8000000357627868,
+        1.6249998807907104
+      ],
+      "size": [
+        1.5,
+        1.8000000357627868,
+        3.249999761581421
+      ]
+    },
+    "runtimeScale": 1.16,
+    "sourceUniformScale": 1,
+    "sourceOrientationPreserved": true,
+    "front": "+Z",
+    "groundY": 0,
+    "modification": "Original geometry, materials, UVs and texture pixels preserved; source PNGs embedded; wrapper scale/centering/grounding"
+  },
+  {
+    "id": "police",
+    "path": "models/kenney-town/police.glb",
+    "sourceLayers": [
+      {
+        "pack": "car-kit",
+        "sourceUrl": "https://kenney.nl/assets/car-kit",
+        "originalLibraryPath": "packs/car-kit/original/Models/GLB format/police.glb",
+        "offlineInput": "_sources/car-kit/police.glb",
+        "originalSha256": "a617b880594f56239b7ac4cf6fd4d74ebdae3ba6c5d842e77c76a5906eff352a",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/car-kit/Textures/colormap.png",
+            "sha256": "f3622a03a20c6696065cae9cbe391351be873508af190c2ebd1d420c055787a5"
+          }
+        ],
+        "license": "licenses/car-kit-License.txt",
+        "licenseSha256": "c33b7f6453d134deae7b1b8493717d9ccfa754c25ab97f6de89b88f8fda19b00",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "distributedSha256": "3a52daabd2dd9a1a8d05a37f6c0b845b97d31807c5177a83c24ac818c2fdd222",
+    "bytes": 208080,
+    "bounds": {
+      "min": [
+        -0.75,
+        0.0,
+        -1.5499998419665815
+      ],
+      "max": [
+        0.75,
+        1.3000000357627868,
+        1.5499998419665812
+      ],
+      "size": [
+        1.5,
+        1.3000000357627868,
+        3.099999683933163
+      ]
+    },
+    "runtimeScale": 1.16,
+    "sourceUniformScale": 1,
+    "sourceOrientationPreserved": true,
+    "front": "+Z",
+    "groundY": 0,
+    "modification": "Original geometry, materials, UVs and texture pixels preserved; source PNGs embedded; wrapper scale/centering/grounding"
+  },
+  {
+    "id": "bus",
+    "path": "models/kenney-town/bus.glb",
+    "sourceLayers": [
+      {
+        "pack": "car-kit",
+        "sourceUrl": "https://kenney.nl/assets/car-kit",
+        "originalLibraryPath": "packs/car-kit/original/Models/GLB format/suv-luxury.glb",
+        "offlineInput": "_sources/car-kit/suv-luxury.glb",
+        "originalSha256": "9e2a79dc050189d4555a88d2e9da0f30ff946ba74f1d43b5b3bda3c193d1f7d7",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/car-kit/Textures/colormap.png",
+            "sha256": "f3622a03a20c6696065cae9cbe391351be873508af190c2ebd1d420c055787a5"
+          }
+        ],
+        "license": "licenses/car-kit-License.txt",
+        "licenseSha256": "c33b7f6453d134deae7b1b8493717d9ccfa754c25ab97f6de89b88f8fda19b00",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "distributedSha256": "3c912a34da5db2f3d838cb8598d152c86ba43d2f1c3d8214335e943fa9da13a7",
+    "bytes": 188652,
+    "bounds": {
+      "min": [
+        -0.75,
+        0.0,
+        -1.4250000715255737
+      ],
+      "max": [
+        0.75,
+        1.299999964237213,
+        1.4250000715255737
+      ],
+      "size": [
+        1.5,
+        1.299999964237213,
+        2.8500001430511475
+      ]
+    },
+    "runtimeScale": 1.16,
+    "sourceUniformScale": 1,
+    "sourceOrientationPreserved": true,
+    "front": "+Z",
+    "groundY": 0,
+    "modification": "Original geometry, materials, UVs and texture pixels preserved; source PNGs embedded; wrapper scale/centering/grounding"
+  },
+  {
+    "id": "tanker",
+    "path": "models/kenney-town/tanker.glb",
+    "sourceLayers": [
+      {
+        "pack": "car-kit",
+        "sourceUrl": "https://kenney.nl/assets/car-kit",
+        "originalLibraryPath": "packs/car-kit/original/Models/GLB format/firetruck.glb",
+        "offlineInput": "_sources/car-kit/firetruck.glb",
+        "originalSha256": "c0c0a22809316536468da7e9c7f57b8ec1a8e387ec3a1cde032976c6d8a6c7a4",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/car-kit/Textures/colormap.png",
+            "sha256": "f3622a03a20c6696065cae9cbe391351be873508af190c2ebd1d420c055787a5"
+          }
+        ],
+        "license": "licenses/car-kit-License.txt",
+        "licenseSha256": "c33b7f6453d134deae7b1b8493717d9ccfa754c25ab97f6de89b88f8fda19b00",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "distributedSha256": "8b81e92ee7851983387e1c1b8fce78eabd0f001d783dcee26b6f593d2e2e95e6",
+    "bytes": 245244,
+    "bounds": {
+      "min": [
+        -0.75,
+        0.0,
+        -1.6999999373340131
+      ],
+      "max": [
+        0.75,
+        1.7000000119209289,
+        1.699999937334013
+      ],
+      "size": [
+        1.5,
+        1.7000000119209289,
+        3.3999998746680262
+      ]
+    },
+    "runtimeScale": 1.16,
+    "sourceUniformScale": 1,
+    "sourceOrientationPreserved": true,
+    "front": "+Z",
+    "groundY": 0,
+    "modification": "Original geometry, materials, UVs and texture pixels preserved; source PNGs embedded; wrapper scale/centering/grounding"
+  },
+  {
+    "id": "depot",
+    "path": "models/kenney-town/depot.glb",
+    "sourceLayers": [
+      {
+        "pack": "city-kit-industrial",
+        "sourceUrl": "https://kenney.nl/assets/city-kit-industrial",
+        "originalLibraryPath": "packs/city-kit-industrial/original/Models/GLB format/building-k.glb",
+        "offlineInput": "_sources/city-kit-industrial/building-k.glb",
+        "originalSha256": "ae0692f7a9fa20bb4ae6cc4deb56d5e1919b1ba2188a1f282295ab2be5e9645d",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/city-kit-industrial/Textures/colormap.png",
+            "sha256": "950f4f891ebd05a2affac810e6eeb0fea1511bc39039b65a3cbf2e17d17bc6a2"
+          }
+        ],
+        "license": "licenses/city-kit-industrial-License.txt",
+        "licenseSha256": "60a8c5c31191256ec9779dc18745dea6d69c46f4b29703459ce064c1765a59ea",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "distributedSha256": "f91b12c6ec1048cd956c496f567f13094362ad412cd2b220f975f46f29ff89f1",
+    "bytes": 84556,
+    "bounds": {
+      "min": [
+        -2.1497176587581635,
+        0.0,
+        -1.507420080900192
+      ],
+      "max": [
+        2.1497176587581635,
+        3.4875000000000003,
+        1.507420080900192
+      ],
+      "size": [
+        4.299435317516327,
+        3.4875000000000003,
+        3.014840161800384
+      ]
+    },
+    "runtimeScale": 1,
+    "sourceUniformScale": 3.3,
+    "sourceOrientationPreserved": true,
+    "front": "-Z",
+    "groundY": 0,
+    "modification": "Original geometry, materials, UVs and texture pixels preserved; source PNGs embedded; wrapper scale/centering/grounding; separate landmark sign added"
+  },
+  {
+    "id": "garage",
+    "path": "models/kenney-town/garage.glb",
+    "sourceLayers": [
+      {
+        "pack": "city-kit-industrial",
+        "sourceUrl": "https://kenney.nl/assets/city-kit-industrial",
+        "originalLibraryPath": "packs/city-kit-industrial/original/Models/GLB format/building-j.glb",
+        "offlineInput": "_sources/city-kit-industrial/building-j.glb",
+        "originalSha256": "58f135e706662a201bc0c660c2c680ec6bf2997233dd61fe03c28d4965b45bc9",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/city-kit-industrial/Textures/colormap.png",
+            "sha256": "950f4f891ebd05a2affac810e6eeb0fea1511bc39039b65a3cbf2e17d17bc6a2"
+          }
+        ],
+        "license": "licenses/city-kit-industrial-License.txt",
+        "licenseSha256": "60a8c5c31191256ec9779dc18745dea6d69c46f4b29703459ce064c1765a59ea",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "distributedSha256": "9cdb25ffdb26d2fcc8261076fe2ad4f2605623f9bae0acda1a002745df5f5d71",
+    "bytes": 99772,
+    "bounds": {
+      "min": [
+        -1.5912638418376448,
+        0.0,
+        -2.01500001847744
+      ],
+      "max": [
+        1.5912638418376446,
+        3.9099999999999997,
+        2.01500001847744
+      ],
+      "size": [
+        3.182527683675289,
+        3.9099999999999997,
+        4.03000003695488
+      ]
+    },
+    "runtimeScale": 1,
+    "sourceUniformScale": 3.1,
+    "sourceOrientationPreserved": true,
+    "front": "-Z",
+    "groundY": 0,
+    "modification": "Original geometry, materials, UVs and texture pixels preserved; source PNGs embedded; wrapper scale/centering/grounding; separate landmark sign added"
+  },
+  {
+    "id": "cafe",
+    "path": "models/kenney-town/cafe.glb",
+    "sourceLayers": [
+      {
+        "pack": "city-kit-commercial",
+        "sourceUrl": "https://kenney.nl/assets/city-kit-commercial",
+        "originalLibraryPath": "packs/city-kit-commercial/original/Models/GLB format/building-k.glb",
+        "offlineInput": "_sources/city-kit-commercial/building-k.glb",
+        "originalSha256": "afd36f573b9d6a6a890675aa0fbe762b29efb6258f322990752d79d9f0da42c6",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/city-kit-commercial/Textures/colormap.png",
+            "sha256": "191bec3889aaaca5018380038fecc129ebb5c2182879a099b7b538b3fa050b5d"
+          }
+        ],
+        "license": "licenses/city-kit-commercial-License.txt",
+        "licenseSha256": "c38cee408d022e57e44e49f1cd655c2fe0dc881a07b881276b795215cdc0de69",
+        "licenseId": "CC0-1.0"
+      },
+      {
+        "pack": "food-kit",
+        "sourceUrl": "https://kenney.nl/assets/food-kit",
+        "originalLibraryPath": "packs/food-kit/original/Models/GLB format/cup-coffee.glb",
+        "offlineInput": "_sources/food-kit/cup-coffee.glb",
+        "originalSha256": "d74652ad1821bc5dedf1b2e1deb4e0ca0c498aa73880e7df5b91e5e729af6f81",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/food-kit/Textures/colormap.png",
+            "sha256": "75baf74d9483a0fc56ac21ceba346fbe16fc24a2a1bf0524c53e6bbe802e1153"
+          }
+        ],
+        "license": "licenses/food-kit-License.txt",
+        "licenseSha256": "32a081c2035dd4db47d850c83244da048165f0e53d71c076b76c1afc0590bc7f",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "distributedSha256": "165702ff35946f1486e6107d060b0a80685463d5080d080bac82fdfdd3cf07a7",
+    "bytes": 276976,
+    "bounds": {
+      "min": [
+        -2.1877674043178557,
+        0.0,
+        -0.9890997827053071
+      ],
+      "max": [
+        2.1877674043178557,
+        3.2200001031160355,
+        0.9890997827053071
+      ],
+      "size": [
+        4.375534808635711,
+        3.2200001031160355,
+        1.9781995654106141
+      ]
+    },
+    "runtimeScale": 1,
+    "sourceUniformScale": 2.1,
+    "sourceOrientationPreserved": true,
+    "front": "-Z",
+    "groundY": 0,
+    "modification": "Original geometry, materials, UVs and texture pixels preserved; source PNGs embedded; wrapper scale/centering/grounding; separate landmark sign added"
+  },
+  {
+    "id": "home-g",
+    "path": "models/kenney-town/home-g.glb",
+    "sourceLayers": [
+      {
+        "pack": "city-kit-suburban",
+        "sourceUrl": "https://kenney.nl/assets/city-kit-suburban",
+        "originalLibraryPath": "packs/city-kit-suburban/original/Models/GLB format/building-type-g.glb",
+        "offlineInput": "_sources/city-kit-suburban/building-type-g.glb",
+        "originalSha256": "f497a7bc3a8e6b6273ba99f090042d1cfb3141da57d3c51998c57a479a0ece11",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/city-kit-suburban/Textures/colormap.png",
+            "sha256": "9b5de86078c25ef02351a80d35ff3c978693a1044565b73eedd9ae9b5b80665d"
+          }
+        ],
+        "license": "licenses/city-kit-suburban-License.txt",
+        "licenseSha256": "d778fa769a89a7d9f167bc337fdf8fc2144e47d9abb0c35eb6ad897c0ee24d0a",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "distributedSha256": "1529e0e0aef763fce293069e42749856366e9952fe0ff3602c6d8c0d3bbede9f",
+    "bytes": 105788,
+    "bounds": {
+      "min": [
+        -2.2021875724196436,
+        0.0,
+        -1.7890874594449997
+      ],
+      "max": [
+        2.2021875724196436,
+        2.3334369510412216,
+        1.7890874594449997
+      ],
+      "size": [
+        4.404375144839287,
+        2.3334369510412216,
+        3.5781749188899994
+      ]
+    },
+    "runtimeScale": 1,
+    "sourceUniformScale": 3.0375,
+    "sourceOrientationPreserved": true,
+    "front": "-Z",
+    "groundY": 0,
+    "modification": "Original geometry, materials, UVs and texture pixels preserved; source PNGs embedded; wrapper scale/centering/grounding"
+  },
+  {
+    "id": "home-k",
+    "path": "models/kenney-town/home-k.glb",
+    "sourceLayers": [
+      {
+        "pack": "city-kit-suburban",
+        "sourceUrl": "https://kenney.nl/assets/city-kit-suburban",
+        "originalLibraryPath": "packs/city-kit-suburban/original/Models/GLB format/building-type-k.glb",
+        "offlineInput": "_sources/city-kit-suburban/building-type-k.glb",
+        "originalSha256": "c1b819a526bbcf9663bc40c98e22337cded7fff7c50c14679132d5d98d75f583",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/city-kit-suburban/Textures/colormap.png",
+            "sha256": "9b5de86078c25ef02351a80d35ff3c978693a1044565b73eedd9ae9b5b80665d"
+          }
+        ],
+        "license": "licenses/city-kit-suburban-License.txt",
+        "licenseSha256": "d778fa769a89a7d9f167bc337fdf8fc2144e47d9abb0c35eb6ad897c0ee24d0a",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "distributedSha256": "a903e077d21c99d7859ea4ac585645db5747328a251ba6e5b42febc5edceb942",
+    "bytes": 101360,
+    "bounds": {
+      "min": [
+        -1.5540828499943018,
+        0.0,
+        -1.7212499678134918
+      ],
+      "max": [
+        1.5540828499943018,
+        3.8798872232437134,
+        1.7212499678134918
+      ],
+      "size": [
+        3.1081656999886036,
+        3.8798872232437134,
+        3.4424999356269836
+      ]
+    },
+    "runtimeScale": 1,
+    "sourceUniformScale": 3.375,
+    "sourceOrientationPreserved": true,
+    "front": "-Z",
+    "groundY": 0,
+    "modification": "Original geometry, materials, UVs and texture pixels preserved; source PNGs embedded; wrapper scale/centering/grounding"
+  },
+  {
+    "id": "home-m",
+    "path": "models/kenney-town/home-m.glb",
+    "sourceLayers": [
+      {
+        "pack": "city-kit-suburban",
+        "sourceUrl": "https://kenney.nl/assets/city-kit-suburban",
+        "originalLibraryPath": "packs/city-kit-suburban/original/Models/GLB format/building-type-m.glb",
+        "offlineInput": "_sources/city-kit-suburban/building-type-m.glb",
+        "originalSha256": "36d31f4e45498f6229805b6a7a1577ef00230daeea4c6a4469481e9d5a0fdb7c",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/city-kit-suburban/Textures/colormap.png",
+            "sha256": "9b5de86078c25ef02351a80d35ff3c978693a1044565b73eedd9ae9b5b80665d"
+          }
+        ],
+        "license": "licenses/city-kit-suburban-License.txt",
+        "licenseSha256": "d778fa769a89a7d9f167bc337fdf8fc2144e47d9abb0c35eb6ad897c0ee24d0a",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "distributedSha256": "6a32153f3946533f22c768a97bedd85dc366c6883924412f2a371231544634d2",
+    "bytes": 109204,
+    "bounds": {
+      "min": [
+        -2.1687751404941085,
+        0.0,
+        -2.168775049969554
+      ],
+      "max": [
+        2.1687751404941085,
+        2.2401561051607133,
+        2.168775049969554
+      ],
+      "size": [
+        4.337550280988217,
+        2.2401561051607133,
+        4.337550099939108
+      ]
+    },
+    "runtimeScale": 1,
+    "sourceUniformScale": 3.0375,
+    "sourceOrientationPreserved": true,
+    "front": "-Z",
+    "groundY": 0,
+    "modification": "Original geometry, materials, UVs and texture pixels preserved; source PNGs embedded; wrapper scale/centering/grounding"
+  },
+  {
+    "id": "home-q",
+    "path": "models/kenney-town/home-q.glb",
+    "sourceLayers": [
+      {
+        "pack": "city-kit-suburban",
+        "sourceUrl": "https://kenney.nl/assets/city-kit-suburban",
+        "originalLibraryPath": "packs/city-kit-suburban/original/Models/GLB format/building-type-q.glb",
+        "offlineInput": "_sources/city-kit-suburban/building-type-q.glb",
+        "originalSha256": "9b56037cab0de804e308766cc5e69b95b3576ffb444084c9016a0748cbcaca04",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/city-kit-suburban/Textures/colormap.png",
+            "sha256": "9b5de86078c25ef02351a80d35ff3c978693a1044565b73eedd9ae9b5b80665d"
+          }
+        ],
+        "license": "licenses/city-kit-suburban-License.txt",
+        "licenseSha256": "d778fa769a89a7d9f167bc337fdf8fc2144e47d9abb0c35eb6ad897c0ee24d0a",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "distributedSha256": "25d4103e594021de47c34d88ba36f66c72b7a8b0758263ef687bf3480b9e973c",
+    "bytes": 110856,
+    "bounds": {
+      "min": [
+        -2.092500016093254,
+        0.0,
+        -1.4944296330213547
+      ],
+      "max": [
+        2.092500016093254,
+        3.0982499420642853,
+        1.4944296330213547
+      ],
+      "size": [
+        4.185000032186508,
+        3.0982499420642853,
+        2.9888592660427094
+      ]
+    },
+    "runtimeScale": 1,
+    "sourceUniformScale": 3.375,
+    "sourceOrientationPreserved": true,
+    "front": "-Z",
+    "groundY": 0,
+    "modification": "Original geometry, materials, UVs and texture pixels preserved; source PNGs embedded; wrapper scale/centering/grounding"
+  },
+  {
+    "id": "town-trash",
+    "path": "models/kenney-town/town-trash.glb",
+    "sourceLayers": [
+      {
+        "pack": "coaster-kit",
+        "sourceUrl": "https://kenney.nl/assets/coaster-kit",
+        "originalLibraryPath": "packs/coaster-kit/original/Models/GLB format/trash.glb",
+        "offlineInput": "_sources/coaster-kit/trash.glb",
+        "originalSha256": "8c21aa5218d0ff4eda68d2e7bf3920e6e6a6f38694679481153081ab3fbd4427",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/coaster-kit/Textures/colormap.png",
+            "sha256": "0d4947d34ff32acf4a359c7f22ca784e057e7e72f622170a9a77b6fc88fdb70e"
+          }
+        ],
+        "license": "licenses/coaster-kit-License.txt",
+        "licenseSha256": "d762110e094924c157772570d034e6dc57d0cebf24663458dbb74e8c9958241a",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "distributedSha256": "a59ce71f97001f808102a4e278be199cc94ca7273a7539042914f7644eaec604",
+    "bytes": 17228,
+    "bounds": {
+      "min": [
+        -0.3603064954280853,
+        0.0,
+        -0.3603064954280853
+      ],
+      "max": [
+        0.3603064954280853,
+        0.7425447046756745,
+        0.3603064954280853
+      ],
+      "size": [
+        0.7206129908561706,
+        0.7425447046756745,
+        0.7206129908561706
+      ]
+    },
+    "runtimeScale": 1,
+    "sourceUniformScale": 1.7,
+    "sourceOrientationPreserved": true,
+    "front": "-Z",
+    "groundY": 0,
+    "modification": "Original geometry, materials, UVs and texture pixels preserved; source PNGs embedded; wrapper scale/centering/grounding"
+  },
+  {
+    "id": "town-traffic-light",
+    "path": "models/kenney-town/town-traffic-light.glb",
+    "sourceLayers": [
+      {
+        "pack": "city-kit-roads",
+        "sourceUrl": "https://kenney.nl/assets/city-kit-roads",
+        "originalLibraryPath": "packs/city-kit-roads/original/Models/GLB format/traffic-light.glb",
+        "offlineInput": "_sources/city-kit-roads/traffic-light.glb",
+        "originalSha256": "6c9ee253b7370e1043168493b2e662b349484a0cdd02100cff04d9d8d1bd9abb",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/city-kit-roads/Textures/colormap.png",
+            "sha256": "a48e2962661ae44368ffddf3054f80ed8491d082b757dcc3011184cd9a98b185"
+          }
+        ],
+        "license": "licenses/city-kit-roads-License.txt",
+        "licenseSha256": "d23f51360ca2cd81711bc5b09ddfb28ac94da96d7ca2dbdef12c50f33f35c353",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "distributedSha256": "af320910122c75f994c30ef2203874e588866b5adb3af6b32aea76462f65af47",
+    "bytes": 32228,
+    "bounds": {
+      "min": [
+        -0.18815999627113345,
+        0.0,
+        -0.14399999380111694
+      ],
+      "max": [
+        0.18815999627113345,
+        1.647999954223633,
+        0.14399999380111694
+      ],
+      "size": [
+        0.3763199925422669,
+        1.647999954223633,
+        0.2879999876022339
+      ]
+    },
+    "runtimeScale": 1,
+    "sourceUniformScale": 3.2,
+    "sourceOrientationPreserved": true,
+    "front": "-Z",
+    "groundY": 0,
+    "modification": "Original geometry, materials, UVs and texture pixels preserved; source PNGs embedded; wrapper scale/centering/grounding"
+  },
+  {
+    "id": "town-road-sign",
+    "path": "models/kenney-town/town-road-sign.glb",
+    "sourceLayers": [
+      {
+        "pack": "city-kit-roads",
+        "sourceUrl": "https://kenney.nl/assets/city-kit-roads",
+        "originalLibraryPath": "packs/city-kit-roads/original/Models/GLB format/road-sign-street.glb",
+        "offlineInput": "_sources/city-kit-roads/road-sign-street.glb",
+        "originalSha256": "570ab030366f549575f0b111fca3965aa8d103043bd3a002f40fad2a3f8175c1",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/city-kit-roads/Textures/colormap.png",
+            "sha256": "a48e2962661ae44368ffddf3054f80ed8491d082b757dcc3011184cd9a98b185"
+          }
+        ],
+        "license": "licenses/city-kit-roads-License.txt",
+        "licenseSha256": "d23f51360ca2cd81711bc5b09ddfb28ac94da96d7ca2dbdef12c50f33f35c353",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "distributedSha256": "22184b16d3fddcf4effd571f4e7dc1bbefc226ab38a64907921a317a4a5dd926",
+    "bytes": 27820,
+    "bounds": {
+      "min": [
+        -0.3140000253915787,
+        0.0,
+        -0.3139996677637101
+      ],
+      "max": [
+        0.31400002539157873,
+        1.5200000762939454,
+        0.31399966776371
+      ],
+      "size": [
+        0.6280000507831573,
+        1.5200000762939454,
+        0.62799933552742
+      ]
+    },
+    "runtimeScale": 1,
+    "sourceUniformScale": 3.2,
+    "sourceOrientationPreserved": true,
+    "front": "-Z",
+    "groundY": 0,
+    "modification": "Original geometry, materials, UVs and texture pixels preserved; source PNGs embedded; wrapper scale/centering/grounding"
+  },
+  {
+    "id": "town-low-fence",
+    "path": "models/kenney-town/town-low-fence.glb",
+    "sourceLayers": [
+      {
+        "pack": "city-kit-suburban",
+        "sourceUrl": "https://kenney.nl/assets/city-kit-suburban",
+        "originalLibraryPath": "packs/city-kit-suburban/original/Models/GLB format/fence-low.glb",
+        "offlineInput": "_sources/city-kit-suburban/fence-low.glb",
+        "originalSha256": "fe0272d73820bb4c8db3bed408a28cbd5c042da1373142bd13122a1ac9d1a168",
+        "textureDependencies": [
+          {
+            "offlineInput": "_sources/city-kit-suburban/Textures/colormap.png",
+            "sha256": "9b5de86078c25ef02351a80d35ff3c978693a1044565b73eedd9ae9b5b80665d"
+          }
+        ],
+        "license": "licenses/city-kit-suburban-License.txt",
+        "licenseSha256": "d778fa769a89a7d9f167bc337fdf8fc2144e47d9abb0c35eb6ad897c0ee24d0a",
+        "licenseId": "CC0-1.0"
+      }
+    ],
+    "distributedSha256": "bd471c76de2a94e51bb84a7ca0e5d4c765863c64f8296fec764941791507a3e5",
+    "bytes": 30768,
+    "bounds": {
+      "min": [
+        -1.5300001144409179,
+        0.0,
+        -1.0049999713897706
+      ],
+      "max": [
+        1.5300001144409179,
+        0.40800000429153443,
+        1.0049999713897706
+      ],
+      "size": [
+        3.0600002288818358,
+        0.40800000429153443,
+        2.009999942779541
+      ]
+    },
+    "runtimeScale": 1,
+    "sourceUniformScale": 2.4,
+    "sourceOrientationPreserved": true,
+    "front": "-Z",
+    "groundY": 0,
+    "modification": "Original geometry, materials, UVs and texture pixels preserved; source PNGs embedded; wrapper scale/centering/grounding"
+  }
+]

@@ -15,7 +15,7 @@ OUT = ROOT / 'public/models/kenney-streets'
 SELECTED = {
     'city-kit-roads': {
         'street-road-straight': 'road-straight',
-        'street-road-corner': 'road-bend-square',
+        'street-road-corner': 'road-bend',
         'street-road-t': 'road-intersection',
         'street-road-cross': 'road-crossroad',
         'street-road-end': 'road-end',

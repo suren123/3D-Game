@@ -181,17 +181,66 @@ class Details:
         w, h, d = size
         self.polygon(name, [(-w / 2, -h / 2), (w / 2, -h / 2), (w / 2, h / 2), (-w / 2, h / 2)], d, color, center)
 
+    def roof_post(self, name, x, z, top, color, width=.12, depth=.12):
+        # A model's maximum Y can be a chimney or a different roof tier. Sample
+        # the actual source triangles under all four post corners instead.
+        levels = [roof_height(self.doc, self.blob, x + dx, z + dz)
+                  for dx in [-width / 2, width / 2] for dz in [-depth / 2, depth / 2]]
+        assert max(levels) - min(levels) < .35, ('Post straddles roof edge', name, levels)
+        bottom = min(levels) - .04
+        assert top > max(levels), (name, bottom, top, levels)
+        self.box(name, [x, (bottom + top) / 2, z], [width, top - bottom, depth], color)
+
+
+def roof_height(doc, blob, x, z):
+    """Intersect a vertical ray with retained City shell triangles, in GLB coordinates."""
+    def values(index):
+        a = doc['accessors'][index]
+        v = doc['bufferViews'][a['bufferView']]
+        size, code = {5121: (1, 'B'), 5123: (2, 'H'), 5125: (4, 'I'), 5126: (4, 'f')}[a['componentType']]
+        count = {'SCALAR': 1, 'VEC3': 3}[a['type']]
+        offset = v.get('byteOffset', 0) + a.get('byteOffset', 0)
+        stride = v.get('byteStride', size * count)
+        return [struct.unpack_from('<' + code * count, blob, offset + i * stride) for i in range(a['count'])]
+    hits = []
+    def visit(index, scale=(1, 1, 1), translation=(0, 0, 0)):
+        node = doc['nodes'][index]
+        assert 'matrix' not in node and 'rotation' not in node
+        ns, nt = node.get('scale', [1] * 3), node.get('translation', [0] * 3)
+        s = [scale[i] * ns[i] for i in range(3)]
+        t = [translation[i] + scale[i] * nt[i] for i in range(3)]
+        if 'mesh' in node and node.get('name', '').startswith('building-'):
+            for primitive in doc['meshes'][node['mesh']]['primitives']:
+                pts = [[t[k] + s[k] * p[k] for k in range(3)] for p in values(primitive['attributes']['POSITION'])]
+                indices = [p[0] for p in values(primitive['indices'])] if 'indices' in primitive else list(range(len(pts)))
+                for j in range(0, len(indices), 3):
+                    a, b, c = [pts[indices[j + k]] for k in range(3)]
+                    den = (b[2]-c[2])*(a[0]-c[0])+(c[0]-b[0])*(a[2]-c[2])
+                    if abs(den) < 1e-10:
+                        continue
+                    u = ((b[2]-c[2])*(x-c[0])+(c[0]-b[0])*(z-c[2])) / den
+                    v = ((c[2]-a[2])*(x-c[0])+(a[0]-c[0])*(z-c[2])) / den
+                    w = 1-u-v
+                    if min(u, v, w) >= -1e-7:
+                        hits.append(u*a[1]+v*b[1]+w*c[1])
+        for child in node.get('children', []):
+            visit(child, s, t)
+    for root in doc['scenes'][0]['nodes']:
+        visit(root)
+    assert hits, ('No real roof under attachment', x, z)
+    return max(hits)
+
 
 def add_details(d, name):
     if name == 'hospital':
-        # Separate low entrance canopy + a large roof-mounted medical placard.
-        d.box('coral entrance canopy', [-.52, .99, -1.67], [1.25, .14, .62], '#E95B5C')
-        d.box('medical sign support', [0, 2.92, -.92], [.14, .76, .14], '#626C85')
-        d.box('medical sign white backing', [0, 3.36, -.98], [1.44, 1.36, .16], '#FFF9ED')
-        d.box('medical cross vertical', [0, 3.36, -1.08], [.36, 1.06, .10], '#D72F45')
-        d.box('medical cross horizontal', [0, 3.36, -1.09], [1.06, .36, .10], '#D72F45')
+        # The previous canopy floated in front of the wall. Keep the authentic
+        # door exposed; seat a shorter plaque above, rather than in, the parapet.
+        d.roof_post('medical sign support', 0, -.64, 3.16, '#626C85', .14, .14)
+        d.box('medical sign white backing', [0, 3.50, -.70], [1.44, 1.12, .16], '#FFF9ED')
+        d.box('medical cross vertical', [0, 3.50, -.80], [.30, .88, .10], '#D72F45')
+        d.box('medical cross horizontal', [0, 3.50, -.81], [.88, .30, .10], '#D72F45')
     elif name == 'school':
-        d.box('book sign support', [.40, 2.74, -.76], [.13, .80, .13], '#466B99')
+        d.roof_post('book sign support', .40, -.76, 3.14, '#466B99', .13, .13)
         # The open-book silhouette has two cream pages and a blue cover/spine.
         for sign in [-1, 1]:
             pts = [(sign * .02, -.40), (sign * .67, -.24), (sign * .67, .48), (sign * .02, .31)]
@@ -201,22 +250,22 @@ def add_details(d, name):
             inner = [(sign * .06, -.31), (sign * .58, -.18), (sign * .58, .37), (sign * .06, .24)]
             if sign == 1:
                 inner.reverse()
-            d.polygon('cream open-book page', inner, .05, '#FFF4CC', [.40, 3.20, -.92])
+            d.polygon('cream open-book page', inner, .05, '#FFF4CC', [.40, 3.20, -.90])
         for sign in [-1, 1]:
             for y in [.18, -.02]:
                 line = [(sign * .49, y), (sign * .15, y - .085), (sign * .15, y - .13), (sign * .49, y - .045)]
-                d.polygon('blue page reading line', line, .025, '#5683AB', [.40, 3.20, -.97])
-        d.box('gold book spine', [.40, 3.16, -.98], [.075, .65, .045], '#F4B94C')
+                d.polygon('blue page reading line', line, .025, '#5683AB', [.40, 3.20, -.935])
+        d.box('gold book spine', [.40, 3.16, -.86], [.075, .65, .18], '#F4B94C')
     elif name == 'shop':
         # A shopping basket sign above the single-storey wing; original green
         # Kenney entrance awning remains visible and unchanged.
-        d.box('basket sign support', [.72, 2.16, -.28], [.12, .70, .12], '#626C85')
+        d.roof_post('basket sign support', .72, -.28, 2.51, '#626C85')
         d.polygon('orange shopping basket', [(-.54, -.38), (.54, -.38), (.67, .29), (-.67, .29)], .22, '#F5A33D', [.72, 2.73, -.38])
         d.box('basket handle top', [.72, 3.35, -.38], [.69, .10, .12], '#F1BA62')
         for x in [.42, 1.02]:
             d.box('basket handle side', [x, 3.17, -.38], [.10, .36, .12], '#F1BA62')
         for x in [.41, .72, 1.03]:
-            d.box('basket cream slot', [x, 2.73, -.51], [.09, .36, .035], '#FFF4CC')
+            d.box('basket cream slot', [x, 2.73, -.50], [.09, .36, .035], '#FFF4CC')
 
 
 def bounds(doc):
@@ -283,7 +332,7 @@ def compose():
                 {'layer': 'Kenney original shell', 'model': pack + '/' + model,
                  'uniformScale': scale, 'geometryMaterialsUVsTextures': 'preserved verbatim'},
                 {'layer': 'Project additions', 'description': {'school': 'Blue/cream open book roof sign with gold spine; no original shell reconstruction',
-                    'hospital': 'Large coral medical cross on cream roof placard and small coral entrance canopy',
+                    'hospital': 'Medical cross on plaque seated above parapet; support sampled against actual roof; original doorway unobstructed',
                     'shop': 'Large orange basket roof sign; original Kenney green awning remains; Kenney Mini fruit display added'}[name]},
                 {'layer': 'Distribution', 'description': 'All distinct source textures embedded; full assembly XZ centered and grounded at y=0; front -Z'}],
             'bounds': {'min': minimum, 'max': maximum, 'size': size},

@@ -1,6 +1,6 @@
 const entries = [
-  ['street-road-straight', '笔直道路', 'road-straight', '带原版虚线及两侧浅色路缘的1×1道路。'],
-  ['street-road-corner', '街角道路', 'road-bend-square', '1×1直角道路；原版方形内角为平滑转弯留出路面。'],
+  ['street-road-straight', '笔直道路', 'road-straight', '带原版连续中心线及两侧浅色路缘的1×1道路。'],
+  ['street-road-corner', '街角道路', 'road-bend', '1×1圆弧道路；原版圆弧路缘和中心线配合车辆平滑转弯。'],
   ['street-road-t', '三岔路口', 'road-intersection', '按地图实际三向连接旋转的1×1丁字路口。'],
   ['street-road-cross', '十字路口', 'road-crossroad', '用于四向连接的1×1十字路口。'],
   ['street-road-end', '道路尽头', 'road-end', '用于单向连接节点的1×1尽头道路。'],

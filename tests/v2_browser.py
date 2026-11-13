@@ -35,10 +35,16 @@ async def travel(p,place):
  await click(p,'destinations');await click(p,'destination-'+place)
  await p.wait_for_function('window.__townTest.snapshot().state.phase!=="moving"',timeout=180000)
  assert (await state(p))['location']==place
-async def prepare(p):
+async def prepare(p,event_choices=None):
  await click(p,'ack');s=await state(p)
  v=next(v for v in VEHICLES if v['id'] in s['mission']['vehicleChoices'] and all(t in v['supports'] for t in s['mission']['requiredTags']))
- await click(p,'vehicle-'+v['id']);await phase(p,'loading')
+ await click(p,'vehicle-'+v['id'])
+ s=await state(p)
+ if s['phase']=='event':
+  assert s['event']['id']=='shortage' and not s['cargo']
+  option=(event_choices or {}).get('shortage','reserve')
+  await click(p,'event-'+option)
+ await phase(p,'loading')
  return v['id']
 async def fill(p):
  s=await state(p);v=next(v for v in VEHICLES if v['id']==s['vehicleId']);capacity=max(1,v['capacity']+s['capacityBonus'])
@@ -138,8 +144,8 @@ async def main():
    for seed,difficulty,choices in [(0,'normal',{'roadworks':'detour'}),(1,'normal',{'shortage':'pickup'}),(10,'challenge',{'repair':'pump'}),(11,'challenge',{'capacity':'two-trips'})]:
     await p.goto(URL+f'?test=1&seed={seed}&difficulty={difficulty}',wait_until='domcontentloaded')
     await p.wait_for_function('window.__townTest?.snapshot().ready',timeout=120000)
-    await click(p,'start');vehicle=await prepare(p);await fill(p);await click(p,'depart')
-    used=await finish(p,choices);s=await snap(p)
+    await click(p,'start');vehicle=await prepare(p,choices);await fill(p);await click(p,'depart')
+    await finish(p,choices);s=await snap(p);used=[e['id'] for e in s['state']['eventHistory']]
     assert s['state']['rewardCount']>=1
     report['scenarios'].append({'seed':seed,'difficulty':difficulty,'events':used,'vehicle':vehicle,'render':s['render']})
     await p.screenshot(path=str(OUT/f'event-{seed}-complete.png'))

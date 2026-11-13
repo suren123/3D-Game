@@ -41,10 +41,10 @@ async def run():
    await p.goto(BASE+'?test=1&seed=2&v='+EXPECTED['version'],wait_until='domcontentloaded')
    await p.wait_for_function('window.__townTest?.snapshot().ready',timeout=120000)
    s=await snap(p);assert s['manifest']['version']==EXPECTED['version']
-   assert s['resources']['icons']==15 and s['audio']['count']==51
+   assert s['resources']['icons']==len(EXPECTED['icons']) and s['audio']['count']==len(EXPECTED['audio'])
    assert sum(r['path'].endswith('.glb') for r in requests)==len(EXPECTED['models'])
-   assert sum(r['path'].endswith('.mp3') for r in requests)==48
-   assert sum(r['path'].startswith('icons/models/') for r in requests)==15
+   assert sum(r['path'].endswith('.mp3') for r in requests)==sum(x['path'].endswith('.mp3') for x in EXPECTED['audio'])
+   assert sum(r['path'].startswith('icons/models/') for r in requests)==len(EXPECTED['icons'])
    baseline=len(requests)
    await click(p,'start');await prepare(p);await fill(p);await click(p,'depart')
    await p.wait_for_function('!!window.__townTest.snapshot().bounds["place-shop"]')
@@ -69,7 +69,7 @@ async def run():
    assert (await state(p))['phase']=='reward' and not (await state(p))['paused']
    assert len(requests)==baseline,requests[baseline:]
    assert not errors,errors
-   print('PASS live current bundle, current models/15 icons/48 voices, driving zoom, direct shop delivery, cargo cleanup, model viewer, no later requests',flush=True)
+   print('PASS live current bundle, all current models/icons/voices, driving zoom, direct shop delivery, cargo cleanup, model viewer, no later requests',flush=True)
   finally:
    try:(OUT/'live-mini-verification.json').write_text(json.dumps({'url':BASE,'bundle':expected,'status':status,'requests':requests,'errors':errors,'snapshot':await snap(p),'transport':'Actual deployed HTTPS responses using system CA verification; no local assets substituted.','limitations':'Software Chromium, no physical iPad test.'},ensure_ascii=False,indent=2))
    finally:await browser.close()

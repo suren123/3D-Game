@@ -1,5 +1,6 @@
-// City Kit Roads: straight/end open along local X. Babylon's glTF loader flips
-// source Z: the original square bend opens -X/-Z, T opens +X/-X/-Z.
+// Babylon's glTF AUTO conversion composes a Y half-turn with scaleZ=-1:
+// source X is reflected, while source Z stays unchanged. Actual loaded meshes
+// therefore open: end -X, rounded bend +X/+Z, T +X/-X/+Z.
 // Directions are clockwise in world X/Z: east, south, west, north.
 // Original asphalt spans 80% of a tile. 3.75 preserves the existing 3m lane
 // width, including the conservative longest-vehicle footprint through turns.
@@ -7,10 +8,10 @@ export const STREET_WIDTH = 3.75;
 // Source asphalt Y=.01, curb Y=.02. Asphalt reaches the unchanged car Y=.2.
 export const STREET_Y = .2 - STREET_WIDTH * .01;
 const templates = [
-  {id: 'street-road-end', directions: [0]},
+  {id: 'street-road-end', directions: [2]},
   {id: 'street-road-straight', directions: [0, 2]},
-  {id: 'street-road-corner', directions: [2, 3]},
-  {id: 'street-road-t', directions: [0, 2, 3]},
+  {id: 'street-road-corner', directions: [0, 1]},
+  {id: 'street-road-t', directions: [0, 1, 2]},
   {id: 'street-road-cross', directions: [0, 1, 2, 3]},
 ];
 const mask = directions => directions.reduce((value, direction) => value | (1 << direction), 0);
@@ -18,7 +19,7 @@ const direction = (a, b) => b.x > a.x ? 0 : b.z > a.z ? 1 : b.x < a.x ? 2 : 3;
 
 /** Create non-overlapping, edge-aligned original Kenney road placements.
  * Each node reserves a width×width tile. Edge pieces fill only the gap between
- * those reserved squares; gaps of 8 or 9 world units therefore close exactly.
+ * those reserved squares; authored 10.5/11m block spacings close exactly.
  * An absent map edge never creates a road opening or a connecting edge piece.
  */
 export function planStreets(map, {width = STREET_WIDTH, y = STREET_Y} = {}) {

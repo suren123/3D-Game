@@ -9,8 +9,8 @@ async def run():
  async with async_playwright() as w:
   b=await w.chromium.launch(executable_path='/usr/bin/chromium',args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
   try:
-   for seed,target,theme in [(2,'shop','coast'),(7,'school','farm'),(14,'hospital','town')]:
-    viewport={'width':1366,'height':1024} if seed==14 else {'width':1180,'height':820}
+   for seed,target,theme in [(2,'shop','coast'),(7,'school','farm'),(19,'hospital','town')]:
+    viewport={'width':1366,'height':1024} if seed==19 else {'width':1180,'height':820}
     ctx=await b.new_context(viewport=viewport,has_touch=True)
     p=await ctx.new_page();requests=[]
     p.on('pageerror',lambda e:errors.append(str(e)))
@@ -43,7 +43,7 @@ async def run():
     await p.wait_for_function('window.__townTest.snapshot().world.cargoMeshCount===0',timeout=30000)
     assert (await state(p))['rewardCount']==1
     map_cycles=[]
-    if seed==14:
+    if seed==19:
      for _ in range(10):
       await click(p,'settings');await click(p,'new-session');await phase(p,'brief')
       changed=await snap(p);assert changed['world']['orphanMeshCount']==0

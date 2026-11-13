@@ -33,7 +33,9 @@ async def run():
       assert b['x']>=s['layout']['panelRect']['x']-2 and b['x']+b['width']<=1182,(key,b)
       assert b['y']>=0 and b['y']+b['height']<=822,(key,b)
      visited.append(expected['id'])
-     if expected['id'] in ['van','shop','camp','school','hospital','street-road-cross','street-lamp','street-bench']:
+     # Every landmark, especially all seven assemblies, needs its own close
+     # image; visiting its metadata is not a visual-quality inspection.
+     if category == 'place' or expected['id'] in ['van','street-road-cross','street-lamp','street-bench']:
       await p.screenshot(path=str(OUT/f'model-viewer-{expected["id"]}.png'))
      await click(p,'model-next')
    assert set(visited)=={m['id'] for m in (await snap(p))['manifest']['models']}

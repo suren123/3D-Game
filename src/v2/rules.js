@@ -1,4 +1,5 @@
 import { GOODS, VEHICLES, PLACES, THEMES, DIFFICULTIES, TEMPLATES, EVENTS } from './catalog.js';
+import { createTownLayout } from './town-layout.js';
 
 const copy = value => JSON.parse(JSON.stringify(value));
 const byId = list => Object.fromEntries(list.map(item => [item.id, item]));
@@ -56,35 +57,7 @@ function nodeRoute(map, start, goal, blockedEdges = []) {
 /** Seed controls geometry, roads and landmark placement; never changes within a session. */
 export function generateMap(seed = 1) {
   seed = clampSeed(seed);
-  const random = seededRandom(seed ^ 0x4d4150);
-  const size = 4;
-  const gapX = 8 + Math.floor(random() * 2), gapZ = 8 + Math.floor(random() * 2);
-  const nodes = Array.from({ length: size * size }, (_, i) => ({
-    id: `n${i}`, x: (i % size - 1.5) * gapX, z: (Math.floor(i / size) - 1.5) * gapZ,
-  }));
-  let edges = [];
-  for (let i = 0; i < nodes.length; i++) {
-    if (i % size < size - 1) edges.push([`n${i}`, `n${i + 1}`]);
-    if (i < size * (size - 1)) edges.push([`n${i}`, `n${i + size}`]);
-  }
-  // A short corner branch gives each town a quiet side road. Keep several loops
-  // in the rest of the grid so roadworks can always close a recoverable segment.
-  const branch = `n${[0, 3, 12, 15][Math.floor(random() * 4)]}`;
-  const branchEdges = edges.filter(edge => edge.includes(branch));
-  const branchExit = branchEdges[Math.floor(random() * branchEdges.length)];
-  edges = edges.filter(edge => edge !== branchExit);
-  const roadCount = 18 + Math.floor(random() * 3);
-  for (const candidate of shuffled(edges, random)) {
-    if (edges.length <= roadCount) break;
-    const next = edges.filter(edge => edge !== candidate);
-    if (nodes.every(node => nodeRoute({ nodes, edges: next }, nodes[0].id, node.id).length)) edges = next;
-  }
-  const slots = shuffled(nodes, random);
-  return {
-    seed, theme: THEMES[Math.floor(random() * THEMES.length)].id, nodes, edges,
-    places: PLACES.map((place, i) => ({ ...place, nodeId: slots[i].id, x: slots[i].x, z: slots[i].z })),
-    depot: 'depot',
-  };
+  return createTownLayout({seed,random:seededRandom(seed ^ 0x4d4150),places:PLACES,themes:THEMES});
 }
 
 export function findRoute(map, fromPlaceId, toPlaceId, blockedEdges = []) {
@@ -100,7 +73,13 @@ function missionFor(seed, difficulty, round, previousTemplateIds) {
   const available = TEMPLATES.filter(template => !previousTemplateIds.includes(template.id));
   const template = available[Math.floor(random() * available.length)];
   const count = difficulty === 'easy' ? 1 : difficulty === 'normal' ? 2 : 3;
-  const selectedGoods = shuffled(template.goods, random).slice(0, count);
+  const pool = shuffled(template.goods, random);
+  // Keep the errand's defining item while retaining the existing random draw
+  // count and variety in its other slots. Names, step counts and speech stay finite.
+  const selectedGoods = pool.slice(0, count);
+  if (template.requiredGood && !selectedGoods.includes(template.requiredGood)) {
+    selectedGoods[selectedGoods.length - 1] = template.requiredGood;
+  }
   const destinations = shuffled(template.places, random);
   const steps = selectedGoods.map((goodId, index) => ({
     goodId, quantity: difficulty === 'easy' ? 1 + Math.floor(random() * 2) : 1,
@@ -159,13 +138,20 @@ export function createGame({ seed = 1, difficulty = 'easy', saved = {} } = {}) {
     events.push({ type: 'reward' });
   }
 
-  function beginEvent(events) {
+  function beginEvent(events, timing = 'delivery') {
     if (state.difficulty === 'easy' || state.eventUsed || state.round !== 0 || remaining().length === 0) return;
     const random = seededRandom(state.seed ^ 0x45564e54);
     let definition = EVENTS[Math.floor(random() * EVENTS.length)];
+    // A stock shortage matters before packing; already packed cargo stays safe.
+    // The other three events keep their existing first-delivery timing.
+    if (timing === 'loading' ? definition.id !== 'shortage' : definition.id === 'shortage') return;
+    const shortageStep = definition.id === 'shortage' ? remaining().find(step =>
+      goods[step.goodId].tag !== 'passenger' &&
+      (state.cargo.find(item => item.goodId === step.goodId)?.quantity || 0) < step.quantity - (state.delivered[step.index] || 0)) : null;
+    if (definition.id === 'shortage' && !shortageStep) return;
     // One remaining unit cannot create a meaningful choice between one trip and several.
     if (definition.id === 'capacity' && (remaining().length < 2 || cargoCount() < 2)) {
-      const alternatives = EVENTS.filter(event => event.id !== 'capacity');
+      const alternatives = EVENTS.filter(event => !['capacity', 'shortage'].includes(event.id));
       definition = alternatives[Math.floor(random() * alternatives.length)];
     }
     state.eventUsed = true;
@@ -183,7 +169,7 @@ export function createGame({ seed = 1, difficulty = 'easy', saved = {} } = {}) {
     } else if (definition.id === 'capacity') {
       state.capacityBonus = 1 - vehicles[state.vehicleId].capacity;
     } else if (definition.id === 'shortage') {
-      state.shortageGoodId = remaining()[0].goodId;
+      state.shortageGoodId = shortageStep.goodId;
     } else if (definition.id === 'repair') {
       state.vehicleHealth = 'soft-tyre';
       state.event.progress = 0;
@@ -225,6 +211,7 @@ export function createGame({ seed = 1, difficulty = 'easy', saved = {} } = {}) {
         if (state.capacityBonus < 0) state.capacityBonus = 1 - selected.capacity;
         state.phase = 'loading';
         state.message = '记得要带什么吗？点一下放一件，再点车上的物品可以放回。';
+        beginEvent(events, 'loading');
         break;
       }
       case 'LOAD': {

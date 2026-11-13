@@ -111,20 +111,6 @@ class ClickSparkles extends Control {
   }
 }
 
-class PlaceLinks extends Control {
-  constructor() { super('place-links'); this.isHitTestVisible=false; this.links=[]; }
-  _draw(ctx) {
-    const m=this._currentMeasure;
-    ctx.save();ctx.translate(m.left,m.top);ctx.scale(m.width/860,m.height/H);
-    for(const p of this.links){
-      line(ctx,[[p.x1,p.y1],[p.x2,p.y2]],'#fffaf0',4);
-      line(ctx,[[p.x1,p.y1],[p.x2,p.y2]],'#789e8b',1.5);
-      circle(ctx,p.x2,p.y2,3,'#789e8b');
-    }
-    ctx.restore();
-  }
-}
-
 function position(control, x, y, width, height) {
   control.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
   control.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
@@ -144,13 +130,12 @@ export function createUI(scene, callbacks = {}) {
     texture.idealHeight = wide ? H : 0;
   };
   fitTexture();
-  const resizeObserver = engine.onResizeObservable.add(() => { fitTexture(); applyPlaces(); });
+  const resizeObserver = engine.onResizeObservable.add(fitTexture);
   texture.rootContainer.isPointerBlocker = false;
-  let screen, frame, markersLayer, lastState = null, panel = null, priorPaused = false;
+  let screen, frame, lastState = null, panel = null, priorPaused = false;
   let mode = 'loading', loadingState = { progress: 0, text: '小镇正在准备，请稍等一会儿。' };
   let sound = true, reducedMotion = false, historicalCount = 0, chosenDifficulty = 'easy', lastSignature = '';
-  let projected = [], disposed = false, orientationBlocked = false, vehiclePage = 0, markers = new Map();
-  let placeLinks = null;
+  let disposed = false, orientationBlocked = false, vehiclePage = 0;
   let modelIcons = new Map();
   let modelCategory = 'vehicle', modelIndex = 0, modelZoom = 1;
   const selectedModels = () => MODEL_CATALOG.filter(model => model.category === modelCategory);
@@ -254,7 +239,7 @@ export function createUI(scene, callbacks = {}) {
   function setup() {
     cancelPress();
     screen?.dispose();
-    buttons.clear(); markers = new Map(); markersLayer = null; placeLinks = null;
+    buttons.clear();
     screen = new Container('ui-screen'); screen.width = '100%'; screen.height = '100%'; screen.zIndex = 1;
     screen.isHitTestVisible = false; texture.addControl(screen);
     frame = new Container('ui-frame'); frame.width = `${W}px`; frame.height = `${H}px`;
@@ -290,8 +275,9 @@ export function createUI(scene, callbacks = {}) {
   function missionRows(parent, y = 158) {
     const mission = lastState?.mission;
     (mission?.steps || []).slice(0, 3).forEach((step, i) => {
-      const row = box(parent, `instruction-${i}`, 12, y + i * 112, 272, 104, i % 2 ? '#e7eddf' : '#eee6d4', 16);
-      text(row, mission.ordered ? `${i + 1}.` : '·', 8, 5, 30, 40, 23, C.teal, 'center', true);
+      const complete=lastState.completed?.includes(i);
+      const row = box(parent, `instruction-${i}`, 12, y + i * 112, 272, 104, complete?'#d7e8d3':i % 2 ? '#e7eddf' : '#eee6d4', 16);
+      text(row, complete?'✓':mission.ordered ? `${i + 1}.` : '·', 8, 5, 30, 40, 23, C.teal, 'center', true);
       icon(row, step.goodId, 38, 6, 38);
       text(row, `${goods[step.goodId]?.name || step.goodId} × ${step.quantity}`, 84, 4, 180, 44, 24, C.ink, 'left', true);
       icon(row, 'arrow', 22, 59, 28, C.teal);
@@ -322,7 +308,7 @@ export function createUI(scene, callbacks = {}) {
       const b = button(card, `vehicle-${car.id}`, '', 12, 152 + i * 116, 272, 108, () => send('SELECT_VEHICLE', { vehicleId: car.id }), { fill: '#ece8d8' });
       icon(b, car.id, 10, 16, 76);
       text(b, car.name, 100, 10, 164, 40, 27, C.ink, 'left', true);
-      const special = { fridge: '冷藏物品', tanker: '运送清水', repair: '携带工具', bus: '搭载朋友' }[car.id] || '日常货物';
+      const special = { fridge: '冷藏物品', tanker: '送水帮忙', repair: '携带工具', bus: '搭载朋友', taxi: '接送朋友', tractor: '清水和工具', ambulance: '接送朋友', police: '携带工具' }[car.id] || '日常货物';
       text(b, special, 100, 40, 164, 34, 22, C.muted);
       text(b, `能装 ${car.capacity} 份`, 100, 74, 164, 34, 22, C.muted);
     });
@@ -350,22 +336,6 @@ export function createUI(scene, callbacks = {}) {
     helpButton(card, 620, 132);
     button(card, 'depart', '装好出发', 152, 620, 132, 72, () => send('DEPART'), { fill: C.teal, ink: C.white, size: 24 });
   }
-  function makeMarkers() {
-    markersLayer = position(new Container('map-places'), 0, 0, WORLD_W, H);
-    markersLayer.isHitTestVisible = false; markersLayer.clipChildren = true;
-    frame.addControl(markersLayer);
-    markersLayer.isVisible = ['explore', 'delivery'].includes(lastState?.phase) && !lastState.paused && !panel && !orientationBlocked;
-    placeLinks=position(new PlaceLinks(),0,0,WORLD_W,H);markersLayer.addControl(placeLinks);
-    for (const place of PLACES) {
-      const b = button(markersLayer, `place-${place.id}`, '', 0, 0, 132, 72, () => send('TRAVEL', { placeId: place.id }), { fill: 'transparent', pressedFill: '#dce9d855', radius: 16 });
-      const chip = box(b, `sign-${place.id}`, 16, 16, 100, 40, '#fffaf0ed', 13);
-      icon(chip, place.id, 3, 6, 28);
-      const shortName = place.name;
-      text(chip, shortName, 32, 0, 66, 40, 21, C.ink, 'center', true);
-      b.isVisible = false; markers.set(place.id, b);
-    }
-    applyPlaces();
-  }
   function getLayout() {
     const size = texture.getSize(), rect = canvas?.getBoundingClientRect();
     const ratio = texture.idealRatio || 1;
@@ -379,40 +349,26 @@ export function createUI(scene, callbacks = {}) {
       scale: { x: sx, y: sy }, logical: { width: W, height: H, worldWidth: WORLD_W },
     };
   }
-  function applyPlaces() {
-    const layout = getLayout();
-    if (!layout.scale || !markersLayer?.isVisible) return;
-    const { worldRect, scale } = layout, placed = [];
-    for (const p of [...projected].sort((a, b) => a.y - b.y)) {
-      const b = markers.get(p.id); if (!b) continue;
-      const x = (p.x - worldRect.x) / scale.x, y = (p.y - worldRect.y) / scale.y;
-      // Every touch rectangle remains strictly inside the left world region.
-      let left = Math.max(4, Math.min(WORLD_W - 136, x - 66));
-      let top = Math.max(4, Math.min(H - 76, y - 88));
-      const visible = p.visible !== false && x >= 0 && x <= WORLD_W && y >= 0 && y <= H;
-      if (visible) {
-        // Avoid other signs and building facades; link displaced signs back
-        // to their actual landmarks so their identity remains unambiguous.
-        const candidates=[0,-90,90,-150,150].map(shift=>{
-          const candidate=Math.max(4,Math.min(WORLD_W-136,x-66+shift));
-          let score=Math.abs(candidate-(x-66));
-          for(const other of placed)if(Math.abs(other.left-candidate)<108&&Math.abs(other.top-top)<44)score+=10000;
-          for(const other of projected){
-            if(other.id===p.id||!other.building||other.visible===false)continue;
-            const bx=(other.building.x-worldRect.x)/scale.x,by=(other.building.y-worldRect.y)/scale.y;
-            if(candidate+116>bx-32&&candidate+16<bx+32&&top+56>by-65&&top+16<by+20)score+=1000;
-          }
-          return {left:candidate,score};
-        }).sort((a,b)=>a.score-b.score);
-        left=candidates[0].left;
-        placed.push({left,top,x1:left+66,y1:top+36,x2:x,y2:y});
-      }
-      b.left = `${Math.round(left)}px`; b.top = `${Math.round(top)}px`; b.isVisible = visible;
-    }
-    if(placeLinks){
-      const key=JSON.stringify(placed.map(p=>[p.x1,p.y1,p.x2,p.y2].map(n=>Math.round(n*10))));
-      if(placeLinks.key!==key){placeLinks.key=key;placeLinks.links=placed;placeLinks._markAsDirty();}
-    }
+  function destinationCards(card, prefix, y, onSelect) {
+    // All nine actual model thumbnails remain visible in the right panel.
+    // Three 86px cards plus two 7px gaps occupy its 272px inner width.
+    PLACES.forEach((place, i) => {
+      const b = button(card, `${prefix}-${place.id}`, '', 12 + (i % 3) * 93, y + Math.floor(i / 3) * 128,
+        86, 116, () => onSelect(place.id), { fill: '#e4eddf', radius: 16 });
+      icon(b, place.id, 7, 4, 72);
+      text(b, place.name, 3, 80, 80, 32, 25, C.ink, 'center', true);
+    });
+  }
+  function exploreHUD() {
+    const s = lastState, card = sidebar();
+    text(card, '想去哪里？', 12, 8, 272, 38, 28, C.ink, 'left', true);
+    text(card, '点建筑或下面的图卡', 12, 48, 272, 34, 22, C.muted);
+    const theme = THEMES.find(t => t.id === s.map?.theme)?.name || '今天的小镇';
+    text(card, `${theme} · 第 ${s.round + 1} / 3 单`, 12, 84, 272, 34, 22, C.teal, 'left', true);
+    destinationCards(card, 'place', 128, id => send('TRAVEL', { placeId: id }));
+    const count = s.cargo.reduce((sum, item) => sum + item.quantity, 0);
+    text(card, count ? `车上带着 ${count} 份` : '车上空空的，可以回仓库装货', 12, 524, 272, 72, 23, C.muted);
+    helpButton(card);
   }
   function drivingHUD() {
     const s = lastState, card = sidebar();
@@ -436,20 +392,16 @@ export function createUI(scene, callbacks = {}) {
       s.cargo.slice(0, 6).forEach((item, i) => text(card, `${goods[item.goodId]?.name} ×${item.quantity}`, 12 + (i % 2) * 140, 386 + Math.floor(i / 2) * 44, 132, 40, 22, C.muted));
       if (!s.cargo.length) text(card, '空空的车厢，可以去仓库装东西。', 12, 388, 272, 100, 24, C.muted);
     }
-    // The camera already shows the whole town after loading and throughout travel.
+    // Selection shows the whole town; driving smoothly follows the car.
     helpButton(card);
   }
   function destinations() {
     const card = sidebar({ close: true });
     title(card, '想去哪里？', '选一个地点，小车就会自己开过去。', { subtitleHeight: 68 });
-    PLACES.forEach((place, i) => {
-      const b = button(card, `destination-${place.id}`, '', 12 + (i % 2) * 140, 144 + Math.floor(i / 2) * 94, 132, 88, () => {
-        panel = null;
-        if (!priorPaused) send('PAUSE', { value: false });
-        send('TRAVEL', { placeId: place.id }); rebuild();
-      });
-      icon(b, place.id, 44, 0, 44);
-      text(b, place.name, 4, 44, 124, 40, 24, C.ink, 'center', true);
+    destinationCards(card, 'destination', 156, id => {
+      panel = null;
+      if (!priorPaused) send('PAUSE', { value: false });
+      send('TRAVEL', { placeId: id }); rebuild();
     });
     button(card, 'close-hint', '回到小镇', 12, 620, 272, 72, closePanel, { fill: C.teal, ink: C.white });
   }
@@ -457,7 +409,8 @@ export function createUI(scene, callbacks = {}) {
     const e = lastState.event, card = sidebar();
     title(card, e?.title || '遇到一点小变化');
     text(card, e?.message || '没关系，一起想个办法。', 12, 82, 272, 180, 23, C.muted);
-    icon(card, e?.id === 'repair' ? 'repair-tool' : e?.id === 'shortage' ? 'parcel' : 'car', 92, 274, 112, C.orange);
+    icon(card, e?.id === 'repair' ? 'repair-tool' : e?.id === 'shortage' ? 'parcel' : 'car', 22, 284, 80, C.orange);
+    button(card, 'event-listen', '再听一次', 116, 292, 168, 68, () => onSpeak('event'), { icon:'listen',size:23 });
     (e?.options || []).forEach((opt, i) => button(card, `event-${opt.id}`, opt.label, 12, 414 + i * 100, 272, 88, () => send('RESOLVE_EVENT', { optionId: opt.id }), { fill: i ? C.mint : C.teal, ink: i ? C.ink : C.white, size: 24 }));
     text(card, '慢慢想，总会有办法。', 12, 632, 272, 50, 22, C.muted, 'center');
   }
@@ -502,15 +455,20 @@ export function createUI(scene, callbacks = {}) {
     });
     text(card, model.name, 12, 150, 272, 46, 28, C.ink, 'left', true);
     text(card, `${model.sourceLabel} · ${modelIndex+1}/${list.length}`, 12, 204, 272, 40, 23, C.teal, 'left', true);
-    text(card, model.packLabel, 12, 250, 272, 62, 23, C.muted);
-    text(card, model.details, 12, 316, 272, 94, 22, C.muted);
+    text(card, model.packLabel.replaceAll(' + ', ' +\n'), 12, 250, 272, 62, 23, C.muted);
+    // Keep the visible caption to one complete descriptive sentence. Full
+    // original-file provenance remains in the catalog and resource documents.
+    // A dedicated clipped region prevents long source notes drawing over controls.
+    const description=position(new Container('model-description'),12,316,272,118);
+    description.isHitTestVisible=false;description.clipChildren=true;card.addControl(description);
+    text(description, model.details.split('。')[0]+'。', 0, 0, 272, 118, 22, C.muted);
     const step = delta => {modelIndex=(modelIndex+delta+list.length)%list.length;modelZoom=1;rebuild();};
-    button(card, 'model-previous', '上一个', 12, 420, 132, 64, ()=>step(-1), {size:23});
-    button(card, 'model-next', '下一个', 152, 420, 132, 64, ()=>step(1), {size:23});
+    button(card, 'model-previous', '上一个', 12, 440, 132, 64, ()=>step(-1), {size:23});
+    button(card, 'model-next', '下一个', 152, 440, 132, 64, ()=>step(1), {size:23});
     const zoom = delta => {modelZoom=Math.max(.65,Math.min(1.6,Math.round((modelZoom+delta)*100)/100));rebuild();};
-    button(card, 'model-zoom-out', '缩小 −', 12, 496, 132, 64, ()=>zoom(-.15), {enabled:modelZoom>.65,size:23});
-    button(card, 'model-zoom-in', '放大 ＋', 152, 496, 132, 64, ()=>zoom(.15), {enabled:modelZoom<1.6,size:23});
-    text(card, `45°斜俯视 · ${Math.round(modelZoom*100)}%`, 12, 572, 272, 40, 22, C.muted, 'center');
+    button(card, 'model-zoom-out', '缩小 −', 12, 516, 132, 64, ()=>zoom(-.15), {enabled:modelZoom>.65,size:23});
+    button(card, 'model-zoom-in', '放大 ＋', 152, 516, 132, 64, ()=>zoom(.15), {enabled:modelZoom<1.6,size:23});
+    text(card, `45°斜俯视 · ${Math.round(modelZoom*100)}%`, 12, 588, 272, 32, 22, C.muted, 'center');
     button(card, 'model-back', '返回设置', 12, 628, 272, 64, ()=>openPanel('settings'), {size:24});
   }
   function landing() {
@@ -547,7 +505,6 @@ export function createUI(scene, callbacks = {}) {
     const interactiveWorld = mode === 'game' && lastState && ['explore', 'delivery'].includes(lastState.phase) && !lastState.paused && !panel;
     if (!interactiveWorld) blockWorld();
     if (mode !== 'game' || !lastState) { landing(); return; }
-    makeMarkers();
     if (panel === 'hint') { brief(true); return; }
     if (panel === 'settings') { settings(); return; }
     if (panel === 'models') { modelViewer(); return; }
@@ -559,6 +516,7 @@ export function createUI(scene, callbacks = {}) {
     else if (lastState.phase === 'event') eventCard();
     else if (lastState.phase === 'reward') reward();
     else if (lastState.phase === 'sessionComplete') reward(true);
+    else if (lastState.phase === 'explore') exploreHUD();
     else drivingHUD();
   }
   function getBounds() {
@@ -587,7 +545,9 @@ export function createUI(scene, callbacks = {}) {
     ready() { mode = 'ready'; rebuild(); },
     setModelIcons(images) { modelIcons = images; rebuild(); },
     setSettings(settings = {}) { sound = settings.sound ?? sound; historicalCount = settings.historicalCount ?? historicalCount; reducedMotion = settings.reducedMotion ?? reducedMotion; if (reducedMotion) { sparkles.bursts = []; sparkles._markAsDirty(); } rebuild(); },
-    setPlaces(points) { projected = points || []; applyPlaces(); },
+    // Keep the world's callback compatible; destination UI no longer projects
+    // labels or leader lines over the actual 3D buildings.
+    setPlaces() {},
     setOrientationBlocked(blocked) {
       const next = !!blocked;
       if (next === orientationBlocked) return;

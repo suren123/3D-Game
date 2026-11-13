@@ -13,7 +13,13 @@ export function buildRoadPath(points, { turnRadius = 2.5, cruiseSpeed = 6.8, tur
     const before=nodes[i-1],corner=nodes[i],after=nodes[i+1],a=unit(before,corner),b=unit(corner,after);
     const cross=a.x*b.z-a.z*b.x,dot=Math.max(-1,Math.min(1,a.x*b.x+a.z*b.z));
     if(Math.abs(cross)<.00001){line(cursor,corner);cursor=corner;continue;}
-    const angle=Math.acos(dot),cut=Math.min(turnRadius*Math.tan(angle/2),distance(before,corner)*.35,distance(corner,after)*.35);
+    // A physical parking pose can start/end only 3m from a junction. Boundary
+    // legs have no neighbouring turn and may use their full length; restricting
+    // them to 35% would shrink the 2.5m arc and cut the rounded inner curb.
+    // Two turns sharing an internal leg each reserve at most 49% of that leg.
+    const entryLimit=distance(before,corner)*(i===1?1:.49);
+    const exitLimit=distance(corner,after)*(i===nodes.length-2?1:.49);
+    const angle=Math.acos(dot),cut=Math.min(turnRadius*Math.tan(angle/2),entryLimit,exitLimit);
     const radius=cut/Math.tan(angle/2),sign=Math.sign(cross);
     const entry={x:corner.x-a.x*cut,z:corner.z-a.z*cut},exit={x:corner.x+b.x*cut,z:corner.z+b.z*cut};
     const center={x:entry.x-a.z*sign*radius,z:entry.z+a.x*sign*radius};
