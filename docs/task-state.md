@@ -99,3 +99,5 @@ GitHub Actions运行43212030141成功，https://suren123.github.io/3D-Game/ 已�
 用户要求恢复开车时的近景。主Agent单独修改world镜头：选地点显示全镇，行驶时平滑缩至全镇视野的55%并跟随汽车，到站后平滑回到全镇；暂停冻结，模型图鉴返回不重置跟随目标。未改角度、资源、引擎或任务规则。
 
 本地生产构建 `index-C5lFOtDC.js` 验证：30项Node测试及资源/构建检查通过；`TOWN_URL=http://127.0.0.1:5196/ python tests/v2_camera.py` 在真实Chromium触控下完成离线商店配送，验证拉近幅度、目标跟随、暂停冻结、图鉴退出继续跟随和到站恢复全镇。实际截图camera-driving.png已人工检查。浏览器为云端SwiftShader，未做iPad真机手感验收。当前进入既有授权下的main/Pages发布与正式站复测。
+
+发布完成：镜头修复提交 `281eb65b849cee1519c2ffc8b3469a5077eaba98`，GitHub Actions [43337143124](https://github.com/suren123/3D-Game/actions/runs/43337143124) 构建部署成功。正式站 `index-C5lFOtDC.js` 已由 `python tests/v2_live.py` 使用实际线上响应验证：行驶拉近、完整商店配送、到站全镇、装卸清理、模型图鉴均通过，开局准备好后无新增资源请求，无页面错误。本轮完成，由主Agent独立实施，无新增子Agent。
