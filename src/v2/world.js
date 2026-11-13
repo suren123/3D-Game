@@ -287,7 +287,11 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
         }
         targetHalfHeight=Math.max(halfHeight,halfWidth/aspect)*1.15/previewZoom;
       }
-    }else targetHalfHeight = Math.max(framing.halfHeight, framing.halfWidth / aspect);
+    }else {
+      const townHalfHeight=Math.max(framing.halfHeight, framing.halfWidth / aspect);
+      // Keep route selection wide; show the car and nearby streets while driving.
+      targetHalfHeight=townHalfHeight*(overviewMode?1:.55);
+    }
     currentHalfHeight=dt?currentHalfHeight+(targetHalfHeight-currentHalfHeight)*(1-Math.exp(-dt*3)):targetHalfHeight;
     // Off-centre projection fits the town into its own rectangle. Keeping the
     // camera's full viewport lets the fullscreen Canvas GUI render normally.
@@ -324,7 +328,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     }else{
       modelPreview.hide();previewId=null;previewZoom=1;
       mapRoot?.setEnabled(true);vehicle?.setEnabled(true);particleMesh.setEnabled(true);
-      camera.beta=.92;aim.copyFrom(mapFocus);camera.setTarget(aim);
+      camera.beta=.92;camera.setTarget(aim);
     }
     fitCamera();return modelPreview.getState();
   }
@@ -420,13 +424,13 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     motion=createRoadMotion(buildRoadPath([{x:position.x,z:position.z},...points]));destination=placeId;moving=true;
     const from=vehicle?.rotation.y||0,delta=Math.atan2(Math.sin(motion.yaw-from),Math.cos(motion.yaw-from));
     departureTurn=!reducedMotion&&Math.abs(delta)>.025?{from,delta,time:0,duration:Math.max(.2,Math.abs(delta)/3.8)}:null;
-    overview();burst('dust',position,10);
+    overviewMode=false;burst('dust',position,10);
   }
   function overview(){overviewMode=true;}
   function effect(kind){if(kind==='rain'||kind==='weather')rainTime=5;else burst(kind==='start'?'dust':kind,position,kind==='reward'?35:12);}
   function update(dt) {
     dt=Math.min(Math.max(Number(dt)||0,0),.1);
-    fitCamera(dt);
+    if(!paused||previewId)fitCamera(dt);
     if(paused||previewId)return;
     clock+=dt;weatherTime+=dt;
     updateCargoAnimation(dt);
@@ -439,11 +443,11 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
       }else{advanceRoadMotion(motion,dt);position.set(motion.x,.2,motion.z);vehicle.rotation.y=motion.yaw;}
       vehicle.position.copyFrom(position);
       travelDust+=dt;if(travelDust>.24){travelDust=0;burst('dust',position,2);}
-      if(motion.done){moving=false;location=destination;destination=null;burst('stop',position,8);onArrival(location);}
+      if(motion.done){moving=false;location=destination;destination=null;overview();burst('stop',position,8);onArrival(location);}
     }
     if(vehicle){vehicle.rotation.x=cargoFeedback;vehicle.rotation.z=-cargoFeedback*.55;}
-    const cameraTarget=mapFocus;
-    aim.copyFrom(Vector3.Lerp(aim,cameraTarget,reducedMotion?1:1-Math.exp(-dt*2.3)));camera.setTarget(aim);
+    const cameraTarget=overviewMode?mapFocus:position;
+    aim.copyFrom(Vector3.Lerp(aim,cameraTarget,reducedMotion?1:1-Math.exp(-dt*4)));camera.setTarget(aim);
     if(weatherTime>35){weatherTime=0;rainTime=4.5;}
     if(rainTime>0){rainTime-=dt;if(!reducedMotion&&Math.floor(clock*15)!==Math.floor((clock-dt)*15))burst('rain',aim,3);}
     for(const p of particles.particles){

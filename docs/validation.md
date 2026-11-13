@@ -108,3 +108,9 @@
 以上为云端Chromium/SwiftShader实际执行结果，不代表iPad Air 4硬件帧率或Safari真机验收。完整50包保留在云端素材库，游戏只前置加载实际使用资源。正式站结果以部署后的实测记录为准。
 
 发布完成：功能提交 `09c4fc189b0cd0b92ad8d53caec143b267da9f88` 已推送main，[Actions 43275476204](https://github.com/suren123/3D-Game/actions/runs/43275476204) 的构建与Pages部署均成功。正式站HTTP200，实测加载 `assets/index-Cfx3VQlw.js`；`python tests/v2_live.py` 使用真实线上HTTPS响应验证全部32模型、15实物图标、48语音，实际Canvas点击完成商店配送，装卸清理、图鉴缩放与返回通过，ready后无新增资源请求、无页面错误。原始记录位于忽略提交的artifacts/v2/live-mini-verification.json。本轮工作完成，无继续运行的实现子Agent。许可证保持原文件CRLF及空白，其他改动空白检查通过。
+
+## 驾驶拉近跟随恢复（2026-11-13）
+
+用户要求恢复开车时的近景。主Agent单独修改world镜头：选地点显示全镇，行驶时平滑缩至全镇视野的55%并跟随汽车，到站后平滑回到全镇；暂停冻结，模型图鉴返回不重置跟随目标。未改角度、资源、引擎或任务规则。
+
+本地生产构建 `index-C5lFOtDC.js` 验证：30项Node测试及资源/构建检查通过；`TOWN_URL=http://127.0.0.1:5196/ python tests/v2_camera.py` 在真实Chromium触控下完成离线商店配送，验证拉近幅度、目标跟随、暂停冻结、图鉴退出继续跟随和到站恢复全镇。实际截图camera-driving.png已人工检查。浏览器为云端SwiftShader，未做iPad真机手感验收。当前进入既有授权下的main/Pages发布与正式站复测。
