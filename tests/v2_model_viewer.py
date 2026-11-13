@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Inspect every actual preloaded model through Canvas controls, offline."""
 import asyncio,json,subprocess
+import io
+from PIL import Image, ImageChops
 from playwright.async_api import async_playwright
 from v2_browser import ROOT,OUT,URL,snap,state,click,prepare,fill,is_game_request
 
@@ -37,6 +39,25 @@ async def run():
      # image; visiting its metadata is not a visual-quality inspection.
      if category == 'place' or expected['id'] in ['van','street-road-cross','street-lamp','street-bench']:
       await p.screenshot(path=str(OUT/f'model-viewer-{expected["id"]}.png'))
+     if expected['id']=='farm':
+      # Fixed-frame evidence at several real GUI zoom levels supplements the
+      # GLB coplanarity regression; it is not a hardware Safari guarantee.
+      farm_frames=[]
+      for zoom_index in range(3):
+       if zoom_index:await click(p,'model-zoom-in')
+       await p.wait_for_timeout(450)
+       captures=[]
+       for frame in range(3):
+        data=await p.screenshot(path=str(OUT/f'farm-stability-{zoom_index}-{frame}.png'))
+        captures.append(Image.open(io.BytesIO(data)).convert('RGB').crop((0,0,850,820)))
+        await p.wait_for_timeout(300)
+       changed=[]
+       for a,b in zip(captures,captures[1:]):
+        difference=ImageChops.difference(a,b)
+        changed.append(sum(any(channel>8 for channel in pixel) for pixel in difference.getdata()))
+       assert max(changed)<100,('Farm view changes without an input',zoom_index,changed)
+       farm_frames.append({'zoom':(await snap(p))['world']['preview']['zoom'],'changedPixels':changed})
+      (OUT/'farm-stability.json').write_text(json.dumps(farm_frames,indent=2))
      await click(p,'model-next')
    assert set(visited)=={m['id'] for m in (await snap(p))['manifest']['models']}
    z=(await snap(p))['world']['preview']['zoom'];await click(p,'model-zoom-in')

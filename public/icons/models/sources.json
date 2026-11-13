@@ -17,7 +17,7 @@
   },
   "farm": {
     "model": "models/town-v2/farm.glb",
-    "sha256": "5366f9c791af2514efa507f16babeb4afec134936c302b7cd25a7474ef6c6c36"
+    "sha256": "fe1af8fb0ae05df222e218526da3b7677753332ac9ca76bd065928e14b161cfd"
   },
   "cafe": {
     "model": "models/kenney-town/cafe.glb",
@@ -33,7 +33,7 @@
   },
   "camp": {
     "model": "models/town-v2/camp.glb",
-    "sha256": "c9bce93a737b5040b3f6c4a4204a19c660d0a2388237a091e988219ae7161510"
+    "sha256": "7f65f54e44f58d91ea8377a04281cb8521d36a35b23db8256223200ae9185ba9"
   },
   "van": {
     "model": "models/kenney-car/van.glb",

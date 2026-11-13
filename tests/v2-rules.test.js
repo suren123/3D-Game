@@ -185,6 +185,8 @@ test('roadworks provides real road detours, keeps every place reachable, and can
     if (before.event?.id !== 'roadworks') continue;
     closures++;
     assert.equal(before.blockedEdges.length, 1);
+    const frontages = new Set(before.map.places.map(place => edgeKey(place.lot.accessEdge)));
+    assert.ok(before.blockedEdges.every(edge => !frontages.has(edgeKey(edge))), 'roadworks never block an actual entrance or the parked vehicle');
     assert.ok(before.map.edges.some(edge => edgeKey(edge) === edgeKey(before.blockedEdges[0])));
     for (const from of PLACES) for (const to of PLACES) {
       const original = findRoute(before.map, from.id, to.id);

@@ -39,35 +39,70 @@ def contains_point(box, point):
             and box['y'] <= point['y'] <= box['y'] + box['height'])
 
 
-async def stable_overview(page):
-    """Wait for three distinct rendered overview frames and all nine cards."""
-    deadline = time.monotonic() + 90
-    previous = None
-    steady = 0
+def assert_neighborhood(shot, half_height=None, settled=False):
+    """Validate the fixed scale and the world-owned focus without assuming town fit."""
+    world, camera = shot['world'], shot['world']['camera']
+    assert camera['mode'] == 'neighborhood' and not camera['overview'], camera
+    assert math.isfinite(camera['halfHeight']) and camera['halfHeight'] > 0, camera
+    if half_height is not None:
+        assert abs(camera['halfHeight'] - half_height) < 1e-4, (half_height, camera)
+    focus = camera['focus']
+    assert all(math.isfinite(focus[axis]) for axis in ('x', 'y', 'z')), camera
+    if world['moving']:
+        assert all(abs(focus[axis] - world['position'][axis]) < 1e-4 for axis in ('x', 'z')), world
+        assert abs(focus['y'] - .8) < 1e-4, focus
+    else:
+        landmark = next(p for p in world['landmarks'] if p['id'] == shot['state']['location'])
+        expected = {'x': world['position']['x'] * .55 + landmark['x'] * .45,
+                    'y': .8,
+                    'z': world['position']['z'] * .55 + landmark['z'] * .45}
+        assert all(abs(focus[axis] - expected[axis]) < 1e-4 for axis in expected), (focus, expected)
+    if settled:
+        assert all(abs(camera['target'][axis] - focus[axis]) < .05 for axis in ('x', 'z')), camera
+
+
+def entrance_stop(shot, place_id):
+    town = shot['state']['map']
+    lot = next(place['lot'] for place in town['places'] if place['id'] == place_id)
+    nodes = {node['id']: node for node in town['nodes']}
+    a, b = (nodes[node_id] for node_id in lot['accessEdge'])
+    dx, dz = b['x'] - a['x'], b['z'] - a['z']
+    t = ((lot['frontageX'] - a['x']) * dx + (lot['frontageZ'] - a['z']) * dz) / (dx * dx + dz * dz)
+    assert 0 <= t <= 1, lot
+    stop = {'x': a['x'] + t * dx, 'z': a['z'] + t * dz}
+    position = shot['world']['position']
+    assert math.hypot(position['x'] - stop['x'], position['z'] - stop['z']) < 1e-4, (position, stop, lot)
+    return stop
+
+
+async def stable_neighborhood(page, timeout=90):
+    """Wait for three distinct near-view frames, including explore card layout."""
+    deadline, previous, steady = time.monotonic() + timeout, None, 0
     while time.monotonic() < deadline:
         shot = await snap(page)
-        labels = {key: box for key, box in shot['bounds'].items() if key.startswith('place-')}
         camera = shot['world']['camera']
-        border = shot['state']['map']['layout']['bounds']
-        centered = (abs(camera['target']['x'] - (border['minX'] + border['maxX']) / 2) < .05
-                    and abs(camera['target']['z'] - (border['minZ'] + border['maxZ']) / 2) < .05)
-        eligible = (shot['state']['phase'] == 'explore' and not shot['state']['paused']
-                    and camera['overview'] and not shot['world']['moving'] and centered and len(labels) == 9)
-        frame = shot['frames']
-        numbers = [camera['halfHeight'], camera['target']['x'], camera['target']['z']]
+        eligible = (shot['state']['phase'] in ('explore', 'delivery', 'loading')
+                    and not shot['state']['paused'] and not shot['world']['moving']
+                    and camera.get('mode') == 'neighborhood' and not camera['overview']
+                    and all(abs(camera['target'][axis] - camera['focus'][axis]) < .05 for axis in ('x', 'z')))
+        labels = {key: box for key, box in shot['bounds'].items() if key.startswith('place-')}
+        if shot['state']['phase'] == 'explore':
+            eligible = eligible and len(labels) == 9
+        numbers = [camera['halfHeight']] + [camera['target'][axis] for axis in ('x', 'z')]
         for key in sorted(labels):
             numbers.extend(labels[key][axis] for axis in ('x', 'y', 'width', 'height'))
-        if eligible and previous and frame != previous['frame']:
+        if eligible and previous and shot['frames'] != previous['frame']:
             delta = max(abs(a - b) for a, b in zip(numbers, previous['numbers'])) if len(numbers) == len(previous['numbers']) else math.inf
             steady = steady + 1 if delta < .05 else 0
             if steady >= 3:
+                assert_neighborhood(shot, settled=True)
                 return shot
         elif not eligible:
             steady = 0
-        if previous is None or frame != previous['frame']:
-            previous = {'frame': frame, 'numbers': numbers}
+        if previous is None or shot['frames'] != previous['frame']:
+            previous = {'frame': shot['frames'], 'numbers': numbers}
         await page.wait_for_timeout(200)
-    raise AssertionError('Overview/labels did not settle across three rendered frames within 90s')
+    raise AssertionError('Neighborhood camera did not settle across three rendered frames')
 
 
 def validate_cards(shot, canvas):
@@ -90,13 +125,18 @@ def validate_cards(shot, canvas):
             assert not overlaps(box, other), ('full touch targets overlap', key, box, other_key, other)
     projected = {place['id']: place for place in shot['places']}
     assert set(projected) == {place['id'] for place in places}
+    visible = []
     for place_id, place in projected.items():
         point = {'x': place['building']['x'] + canvas['x'], 'y': place['building']['y'] + canvas['y']}
         assert math.isfinite(point['x']) and math.isfinite(point['y']), (place_id, point)
-        assert contains_point(view, point), ('building tap point is outside the world viewport', place_id, point, view)
+        if not contains_point(view, point):
+            continue  # Distant places remain selectable through their nine cards.
+        visible.append(place_id)
         for key, box in shot['bounds'].items():
-            assert not contains_point(box, point), ('a UI target hides the building tap point', place_id, point, key, box)
-    return {'worldViewport': view, 'panelViewport': panel, 'destinationCards': labels, 'buildingPointsChecked': sorted(projected)}
+            assert not contains_point(box, point), ('a UI target hides a visible building tap point', place_id, point, key, box)
+    assert shot['state']['location'] in visible, ('current landmark must be visible', visible)
+    return {'worldViewport': view, 'panelViewport': panel, 'destinationCards': labels, 'visibleBuildingPointsChecked': sorted(visible)}
+
 
 
 async def edge_tap(page, shot, side, place_id):
@@ -159,7 +199,7 @@ async def main():
                 # Empty departure is an exposed, valid child action; no cargo or
                 # delivery is needed to inspect destination hit targets.
                 await click(page, 'depart')
-                shot = await stable_overview(page)
+                shot = await stable_neighborhood(page)
                 canvas = await page.locator('canvas:visible').bounding_box()
                 assert canvas
                 stem = f'map-variety-{current_index:02d}-{shot["state"]["seed"]}'
@@ -182,7 +222,7 @@ async def main():
                     # settings/new-session controls rather than a test command.
                 assert len(requests) == baseline, requests[baseline:]
                 assert not errors, errors
-                print(f'PASS map {current_index}: seed={town["seed"]} template={town["layout"]["templateId"]} theme={town["theme"]}; nine separate panel cards and unobstructed buildings', flush=True)
+                print(f'PASS map {current_index}: seed={town["seed"]} template={town["layout"]["templateId"]} theme={town["theme"]}; nine separate panel cards and unobstructed visible buildings', flush=True)
                 report['coverage'] = {'templates': sorted(templates), 'themes': sorted(themes),
                     'missingTemplates': sorted(EXPECTED_TEMPLATES - templates), 'missingThemes': sorted(EXPECTED_THEMES - themes)}
                 REPORT.write_text(json.dumps(report, ensure_ascii=False, indent=2))

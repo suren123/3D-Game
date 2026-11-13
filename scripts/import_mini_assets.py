@@ -200,15 +200,22 @@ def compose_camp(library=None):
         view = doc['bufferViews'][accessor['bufferView']]
         offset = view.get('byteOffset', 0) + accessor.get('byteOffset', 0)
         stride = view.get('byteStride', 12)
+        moved = []
         for i in range(accessor['count']):
             point = struct.unpack_from('<fff', binary, offset + i * stride)
-            struct.pack_into('<fff', binary, offset + i * stride, *[point[k] + shift[k] for k in range(3)])
+            # The source's negative-X stool would sit directly in the -Z
+            # doorway after unrotating the tent. Move only that stool to the
+            # free left-side gap between the crate, flag and stones.
+            stool_shift = (1.6, 0, 1.25) if name == 'bark' and point[0] < 0 else (0, 0, 0)
+            moved.append([point[k] + shift[k] + stool_shift[k] for k in range(3)])
+            struct.pack_into('<fff', binary, offset + i * stride, *moved[-1])
         for key in ['min', 'max']:
-            accessor[key] = [accessor[key][k] + shift[k] for k in range(3)]
+            accessor[key] = [(min if key == 'min' else max)(point[k] for point in moved) for k in range(3)]
     layers = [
-        # Face the open gable towards the fixed (+X,-Z) Babylon camera. Its
-        # glTF handedness conversion mirrors X; +45deg here becomes that view.
-        ('_sources/nature-kit/tent_smallOpen.glb', [-.3, .345, -.1], 4.1, math.pi / 4, 'matte-cloth'),
+        # Actual Babylon AUTO loading mirrors X, but the source open gable
+        # already faces world -Z. Keep it aligned with the other town fronts;
+        # the former +45deg pointed the opening straight at the camera instead.
+        ('_sources/nature-kit/tent_smallOpen.glb', [-.3, .345, -.1], 4.1, 0, 'matte-cloth'),
         ('forest-tree.glb', [1.35, .14, .9], .95, 0, None),
         ('forest-tree.glb', [-1.80, .14, .7], .70, 0, None),
         ('forest-flag.glb', [1.25, .14, -.50], 1.75, 0, None),
@@ -232,8 +239,11 @@ def compose_camp(library=None):
     write_glb(path, doc, binary)
     record = {'id': 'camp', 'file': 'camp.glb', 'distributedSha256': hashlib.sha256(path.read_bytes()).hexdigest(),
         'bytes': path.stat().st_size, 'projectBase': {'file': '_sources/camp-base.glb',
-            'sha256': hashlib.sha256(base.read_bytes()).hexdigest()}, 'sourceLayers': records,
-        'modification': 'Use open matte Nature tent; separate trees/flag/stones and crate/stools without triangle crossings; all props sit on platform; Mini tent retained historically but not in runtime camp'}
+            'sha256': hashlib.sha256(base.read_bytes()).hexdigest(),
+            'primitiveTranslations': {'brown': [.2, .14, .1], 'cream': [.2, .14, .1], 'bark': [.4, .14, -.3]},
+            'stoolAdjustment': {'sourceMaterial': 'bark', 'sourceVertexSelection': 'x < 0',
+                'additionalTranslation': [1.6, 0, 1.25], 'reason': 'Clear the world -Z entrance; place the one front stool in the left-side gap'}}, 'sourceLayers': records,
+        'modification': 'Keep the open matte Nature tent entrance aligned to Babylon world -Z like the other buildings (source rotationY 0); move only the doorway stool to the free left-side gap; preserve tent scale/colors and other props; all feet sit on platform; Mini tent retained historically but not in runtime camp'}
     (TOWN / 'camp-sources.json').write_text(json.dumps(record, ensure_ascii=False, indent=2) + '\n')
     print('camp.glb rebuilt from isolated project base and Nature/Mini sources', path.stat().st_size)
 

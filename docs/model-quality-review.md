@@ -30,7 +30,7 @@
 | 餐厅 | 杯移到无遮挡屋面并降低，12个杯底点均接触屋面，与屋顶设施分开 | [餐厅](previews/goal/models-after/cafe.png) |
 | 仓库 | 四角采样具体屋面，柱底伸入实体屋面并连接包裹 | [仓库](previews/goal/models-after/depot.png) |
 | 学校 | 柱脚延到真实坡顶，书页/书脊层也真正相接 | [学校](previews/goal/models-after/school.png) |
-| 营地 | 使用Nature `tent_smallOpen`，内部转45°让开口朝镜头；重新摆放树、旗、石、木箱和凳子，入口可见内部地面 | [营地](previews/goal/models-after/camp.png) |
+| 营地 | 使用Nature `tent_smallOpen`，内部旋转0°，入口朝-Z与其他建筑统一（此前45°仅看见入口但方向不一致）；重新摆放树、旗、石、木箱和凳子，入口可见内部地面 | [营地](previews/goal/models-after/camp.png) |
 | 医院 | 删除脱墙雨棚，保留完整原门面；白牌缩短并置于屋面上方，支杆有真实接点 | [医院](previews/goal/models-after/hospital.png) |
 | 商店 | 支柱落点按实际屋面计算，槽面与篮体相接；保留原商业楼和绿色雨篷 | [商店](previews/goal/models-after/shop.png) |
 
@@ -41,3 +41,9 @@
 新帐篷输入及Nature CC0许可保留在`public/models/kenney-mini/`，完整组合来源、变换、独立基底和SHA在`public/models/town-v2/camp-sources.json`。Nature旧导出的布/木材metallic=1在组合层明确改为0，保留原色与粗糙度；原始输入不改。三组生成器在项目外隔离重建，最终模型与来源记录字节一致。
 
 后续完整驾驶、任务与线上验收见[验证记录](validation.md)，此页的模型静态审查不代表这些流程已经通过。
+
+## 农场门板闪烁复查（后续反馈）
+
+原生成器先由house创建默认深蓝门，farm又叠加专用棕门；两门正面z=-1.55、背面z=-1.47完全共面，确认为Z-fighting。farm现在关闭默认门/默认门框/默认把手，只保留专用棕门。白斜撑交点另有重合面，深度错开1cm并保持压接门板。仅隔离重建farm，未批量覆盖其他模型；真实Babylon loader新增门板多点与斜撑交点检测，三项组合/营地/农场测试通过。浏览器连续画面结论以本轮validation为准。
+
+农场复查对照：[旧门板](previews/frontage/farm-before.png) / [修复后](previews/frontage/farm-after.png)。最终MneTPOvx实际图鉴100%、115%、130%各连续3帧；世界区域相邻帧大于8色阶的差异像素分别12/2、0/0、0/0，未重现明显门板交替闪烁。独立审查逐图核对，保留真实iPad未验证限制。

@@ -20,6 +20,7 @@ import traceback
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+from v2_map_variety import assert_neighborhood
 from v2_browser import OUT, URL, VEHICLES, snap, click, prepare, fill, phase, is_game_request
 
 
@@ -220,20 +221,24 @@ async def hospital_case(browser, args, report, output):
             await page.wait_for_function('window.__townTest.snapshot().world.cargoMeshCount===0', timeout=30000)
             checked(report, 'Real shelf loading finishes and removes temporary cargo meshes')
         await click(page, 'depart')
-        wide = (await snap(page))['world']['camera']['halfHeight']
+        departure = await snap(page)
+        assert_neighborhood(departure)
+        near_height = departure['world']['camera']['halfHeight']
         if not args.weather_only:
             await click(page, 'place-hospital')
             await page.wait_for_function('''h=>{const w=window.__townTest.snapshot().world;
-                return w.moving&&!w.camera.overview&&w.camera.halfHeight<h*.70&&w.particleCount>0}''',
-                arg=wide, timeout=90000)
+                return w.moving&&w.camera.mode==="neighborhood"&&!w.camera.overview&&Math.abs(w.camera.halfHeight-h)<.0001&&w.particleCount>0}''',
+                arg=near_height, timeout=90000)
             case['driving'] = await snap(page)
+            assert_neighborhood(case['driving'], near_height)
             await observer.screenshot('feedback-hospital-driving.png')
             await assert_paused(page, report, case, 'Driving feedback')
             await phase(page, 'delivery')
             arrived = await snap(page)
             assert arrived['state']['location'] == 'hospital'
+            assert_neighborhood(arrived, near_height)
             await observer.screenshot('feedback-hospital-arrived.png')
-            checked(report, 'Real hospital route shows the close driving view and arrives at the hospital')
+            checked(report, 'Real hospital route keeps the fixed close driving view and arrives at the hospital')
             step = arrived['state']['mission']['steps'][0]
             for _ in range(step['quantity']):
                 await click(page, 'deliver-' + step['goodId'])

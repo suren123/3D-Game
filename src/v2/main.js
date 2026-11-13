@@ -173,7 +173,7 @@ window.addEventListener('pageshow',fitViewport);
 document.querySelector('#graphics-error button').addEventListener('click',()=>location.reload());
 if(testMode)Object.defineProperty(window,'__townTest',{value:Object.freeze({
   snapshot:()=>({state:game.getState(),ready,started,resources:resources?.stats,audio:audio?.stats(),world:world?.getState(),
-    bounds:ui?.getBounds(),places:world?.projectPlaces(),layout:ui?.getLayout?.(),modelView:ui?.getModelView(),orientationBlocked,
+    bounds:ui?.getBounds(),places:world?.projectPlaces(),layout:ui?.getLayout?.(),modelView:ui?.getModelView(),cargoTransfer:ui?.getCargoTransfer?.(),orientationBlocked,
     standalone:window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true,
     settings:{...settings},frames:frameCount,manifest:RESOURCE_MANIFEST,
     vehicleMaterials:scene?.meshes.filter(m=>m.name.startsWith(`${game.getState().vehicleId}:`)&&m.material).map(m=>({name:m.name,lights:m._lightSources?.length,

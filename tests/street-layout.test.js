@@ -194,8 +194,8 @@ test('real road geometry contains parked and travelling vehicles across consecut
         for(const p of [...body,point(0,0),point(-width,0),point(width,0),point(0,-length),point(0,length)])assert.ok(asphalt(p),`${label}: body leaves actual loaded asphalt`);
       }
     };
-    const trip=(from,to,start)=>{
-      const plan=planParkingRoute(map,findRoute(map,from,to),{position:start}),path=buildRoadPath(plan.points);
+    const trip=(from,to,start,blockedEdges=[])=>{
+      const plan=planParkingRoute(map,findRoute(map,from,to,blockedEdges),{position:start},{placeId:to,blockedEdges}),path=buildRoadPath(plan.points);
       for(let d=0;d<path.length;d+=.2)check(sampleRoadPath(path,d),`seed${seed} ${from}->${to} at ${d.toFixed(1)}m`);
       const end=sampleRoadPath(path,path.length);check(end,`seed${seed} ${to} stopped`);return end;
     };
@@ -203,8 +203,20 @@ test('real road geometry contains parked and travelling vehicles across consecut
     for(const place of [...map.places.filter(p=>p.id!=='depot'),{id:'depot'}]){
       pose=trip(location,place.id,pose);location=place.id;
     }
-    for(const place of map.places.filter(p=>p.id!=='depot')){
-      const stop=trip('depot',place.id,initialParkingPose(map));trip(place.id,'depot',stop);
+    for(const from of map.places)for(const to of map.places){
+      if(from.id===to.id)continue;
+      const stop=trip(from.id,to.id,initialParkingPose(map,from.id));
+      trip(to.id,from.id,stop);
+    }
+    // Exercise detours on the same loaded asphalt, reserving actual entrance
+    // edges exactly as the roadworks rules do. Pure graph checks alone cannot
+    // show that a changed junction approach contains the complete body.
+    const key=edge=>[...edge].sort().join(':');
+    const frontages=new Set(map.places.map(place=>key(place.lot.accessEdge)));
+    const blocked=map.edges.find(edge=>!frontages.has(key(edge))&&map.places.every(place=>findRoute(map,'depot',place.id,[edge]).length));
+    assert.ok(blocked);
+    for(const from of map.places)for(const to of map.places){
+      if(from.id!==to.id)trip(from.id,to.id,initialParkingPose(map,from.id),[blocked]);
     }
   }
   // This tests translated driving and stopped poses. The existing visual
@@ -212,7 +224,7 @@ test('real road geometry contains parked and travelling vehicles across consecut
   // a full collision/turnaround system is explicitly outside this correction.
 });
 
-test('three acceptance seeds instantiate every street decoration and clean event models',()=>{
+test('three acceptance seeds place road fixtures only where legal and clean event models',()=>{
   // NullEngine exercises real world placement and cleanup, with inert model
   // containers. Geometry orientation is independently checked above; rendering
   // and actual GLB loading remain browser acceptance responsibilities.
@@ -225,11 +237,16 @@ test('three acceptance seeds instantiate every street decoration and clean event
     return {rootNodes:[root],dispose(){root.dispose();}};
   }};
   const world=createWorld(scene,{assets:new Proxy({},{get:()=>model})});
+  const seenDecorations=new Set();
   try {
     for(const seed of [2,7,14]){
       const state=createGame({seed}).getState();world.sync(state);
       const info=world.getState().streetInfo;
-      for(const id of ['street-lamp','street-bench','street-flower','town-trash','town-road-sign'])assert.ok(info.decorationIds.includes(id));
+      for(const id of info.decorationIds)seenDecorations.add(id);
+      for(const fixture of info.fixturePlacements){
+        if(fixture.edge)assert.ok(state.map.edges.some(edge=>[...edge].sort().join(':')===[...fixture.edge].sort().join(':')));
+        if(fixture.junctionId)assert.ok(state.map.edges.filter(edge=>edge.includes(fixture.junctionId)).length>=3);
+      }
       assert.ok(info.decorationCount>=5&&info.decorationCount<=11);
       const meshes=scene.meshes.filter(m=>m.name.startsWith('street-'));
       assert.ok(meshes.length>info.tileCount);
@@ -240,5 +257,6 @@ test('three acceptance seeds instantiate every street decoration and clean event
       assert.deepEqual(world.getState().streetInfo.roadworkModelIds,[]);
       assert.equal(scene.meshes.filter(m=>m.name.startsWith('street-')).length,meshes.length,'event cleanup releases every temporary street model');
     }
+    for(const id of ['street-lamp','street-bench','street-flower','town-trash','town-road-sign'])assert.ok(seenDecorations.has(id),'representative maps collectively exercise retained decoration models');
   } finally {world.dispose();scene.dispose();engine.dispose();}
 });

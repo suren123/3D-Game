@@ -6,7 +6,7 @@ import { TOWN_MODELS } from './town-assets.js';
 const vehicleFiles={van:'van',truck:'truck',fridge:'delivery',tanker:'firetruck',repair:'truck-flat',bus:'suv'};
 const townModels=['depot','park','school','hospital','farm','cafe','garage','shop','camp'];
 export const RESOURCE_MANIFEST = Object.freeze({
-  version:'town-neighborhoods-2',
+  version:'town-frontage-3',
   models:[...new Map([...Object.entries(vehicleFiles).map(([id,file])=>({id,path:['bus','tanker'].includes(id)?`models/town-v2/${id}.glb`:`models/kenney-car/${file}.glb`})),
     ...townModels.map(id=>({id,path:`models/${['school','hospital','shop'].includes(id)?'kenney-landmarks':'town-v2'}/${id}.glb`})),
     ...[['home-a','building-type-a'],['home-c','building-type-c'],['home-f','building-type-f'],['planter','planter']].map(([id,file])=>({id,path:`models/kenney-suburban/${file}.glb`})),

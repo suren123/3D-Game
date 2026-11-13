@@ -66,7 +66,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   let departureTurn = null;
   let parkingHeading = 0;
   let cargoAnimation = null, cargoFeedback = 0;
-  let clock = 0, weatherTime = 0, rainTime = 0, travelDust = 0, overviewMode = true;
+  let clock = 0, weatherTime = 0, rainTime = 0, travelDust = 0;
   let boardBounds={minX:-20,maxX:20,minZ:-20,maxZ:20};
   let parkedVehicleIds=[];
   let mapRadius = 20, targetHalfHeight = 23, currentHalfHeight = 23;
@@ -78,7 +78,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   const aim = Vector3.Zero();
   const position = new Vector3(0, .14, 0);
   const mapInstances = [], places = new Map(), placement = new Map();
-  let streetInfo = {tileCount: 0, junctionCount: 0, decorationIds: [], decorationCount: 0, roadModelIds: []};
+  let streetInfo = {tileCount: 0, junctionCount: 0, decorationIds: [], decorationCount: 0, fixturePlacements: [], roadModelIds: []};
   let roadworkInstances = [];
   let cosmeticState = 71891;
   const cosmetic = () => ((cosmeticState = (Math.imul(cosmeticState, 1664525) + 1013904223) >>> 0) / 4294967296);
@@ -194,7 +194,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     const nodes = new Map(map.nodes.map(n=>[n.id,n]));
     const streetPieces = planStreets(map);
     streetInfo = {tileCount: streetPieces.length, junctionCount: streetPieces.filter(p=>p.kind==='node').length,
-      decorationCount: 0, decorationIds: [], roadModelIds: [...new Set(streetPieces.map(p=>p.id))]};
+      decorationCount: 0, decorationIds: [], fixturePlacements: [], roadModelIds: [...new Set(streetPieces.map(p=>p.id))]};
     for (const piece of streetPieces) {
       const tile = decoration(piece.id, piece.position, 1, piece.rotation);
       tile.scaling.set(...piece.scale);
@@ -292,16 +292,87 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
       }
       gardenCenters.push(parking);
     }
-    // A few lamps sit outside straight edge midpoints, leaving junctions and
+    // Small verge decorations sit outside edge midpoints, leaving junctions and
     // the large landmark touch targets clear. No procedural street markings.
     const streetSpots=[];
-    const streetKinds=[['street-lamp',3.2],['street-bench',1.65],['street-flower',1.25],['town-trash',1],['town-road-sign',1]].filter(([id])=>lookup(id));
+    const streetKinds=[['street-bench',1.65],['street-flower',1.25],['town-trash',1]].filter(([id])=>lookup(id));
     const addStreetSpot=(x,z,rotation)=>{
-      if(streetSpots.length>=10||gardenCenters.some(p=>Math.hypot(p.x-x,p.z-z)<3.3)||streetSpots.some(p=>Math.hypot(p.x-x,p.z-z)<3))return false;
+      if(streetSpots.length>=6||gardenCenters.some(p=>Math.hypot(p.x-x,p.z-z)<3.3)||streetSpots.some(p=>Math.hypot(p.x-x,p.z-z)<3)||fixtureBounds.some(b=>x>b.min.x-.9&&x<b.max.x+.9&&z>b.min.z-.9&&z<b.max.z+.9))return false;
       const [id,scale]=streetKinds[streetSpots.length%streetKinds.length];
       streetDecoration(id,[x,.06,z],scale,rotation);
       streetSpots.push({x,z});return true;
     };
+    // These Kenney fixtures have different authored axes and pole origins.
+    // Values are measured after the real Babylon GLTF conversion: lamp arm -Z,
+    // signal lenses +X, and the two sign wings +X/+Z. Anchor the pole, not the
+    // centred model bounds; never use a camera-facing or board-edge fallback.
+    // Conservative XZ envelopes include the complete arm, wings and lens hood.
+    const fixtureSpecs={
+      'street-lamp':{scale:3.2,base:{x:0,z:0},min:{x:-.025,z:-.212501},max:{x:.025,z:.025}},
+      'town-road-sign':{scale:1,base:{x:-.234,z:-.234},min:{x:-.314001,z:-.314001},max:{x:.314001,z:.314001}},
+      'town-traffic-light':{scale:1.15,base:{x:-.04416,z:0},min:{x:-.188161,z:-.144001},max:{x:.188161,z:.144001}},
+    };
+    const rotate=(p,yaw)=>({x:p.x*Math.cos(yaw)+p.z*Math.sin(yaw),z:p.z*Math.cos(yaw)-p.x*Math.sin(yaw)});
+    const overlaps=(a,b)=>a.min.x<b.max.x+.035&&a.max.x>b.min.x-.035&&a.min.z<b.max.z+.035&&a.max.z>b.min.z-.035;
+    const roadHalf=(map.layout?.roadWidth||3)/2;
+    const laneBounds=map.edges.map(([aId,bId])=>{
+      const a=nodes.get(aId),b=nodes.get(bId);
+      return {min:{x:Math.min(a.x,b.x)-(a.x===b.x?roadHalf:0),z:Math.min(a.z,b.z)-(a.z===b.z?roadHalf:0)},
+        max:{x:Math.max(a.x,b.x)+(a.x===b.x?roadHalf:0),z:Math.max(a.z,b.z)+(a.z===b.z?roadHalf:0)}};
+    });
+    const lotBounds=lot=>({min:{x:lot.x-lot.width/2,z:lot.z-lot.depth/2},max:{x:lot.x+lot.width/2,z:lot.z+lot.depth/2}});
+    const walkwayBounds=allLots.flatMap(lot=>(lot.walkway||[]).slice(1).map((b,i)=>{
+      const a=lot.walkway[i],half=.46;
+      return {min:{x:Math.min(a.x,b.x)-half,z:Math.min(a.z,b.z)-half},max:{x:Math.max(a.x,b.x)+half,z:Math.max(a.z,b.z)+half}};
+    }));
+    const fixtureBounds=[];
+    const addFixture=(id,base,yaw,context)=>{
+      if(!lookup(id))return false;
+      const spec=fixtureSpecs[id],offset=rotate({x:spec.base.x*spec.scale,z:spec.base.z*spec.scale},yaw);
+      const origin={x:base.x-offset.x,z:base.z-offset.z};
+      const corners=[[spec.min.x,spec.min.z],[spec.min.x,spec.max.z],[spec.max.x,spec.min.z],[spec.max.x,spec.max.z]].map(([x,z])=>{
+        const p=rotate({x:x*spec.scale,z:z*spec.scale},yaw);return {x:origin.x+p.x,z:origin.z+p.z};
+      });
+      const bounds={min:{x:Math.min(...corners.map(p=>p.x)),z:Math.min(...corners.map(p=>p.z))},max:{x:Math.max(...corners.map(p=>p.x)),z:Math.max(...corners.map(p=>p.z))}};
+      if(bounds.min.x<boardBounds.minX||bounds.max.x>boardBounds.maxX||bounds.min.z<boardBounds.minZ||bounds.max.z>boardBounds.maxZ||
+        [...laneBounds,...allLots.map(lotBounds),...walkwayBounds,...fixtureBounds].some(other=>overlaps(bounds,other)))return false;
+      streetDecoration(id,[origin.x,.06,origin.z],spec.scale,yaw);fixtureBounds.push(bounds);
+      const facing=rotate(id==='street-lamp'?{x:0,z:-1}:id==='town-traffic-light'?{x:1,z:0}:{x:Math.SQRT1_2,z:Math.SQRT1_2},yaw);
+      streetInfo.fixturePlacements.push({id,position:origin,base:{...base},rotation:yaw,facing,...context});
+      return true;
+    };
+    let lampCount=0;
+    for(const [aId,bId]of map.edges){
+      if(lampCount>=2)break;
+      const a=nodes.get(aId),b=nodes.get(bId),dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz);
+      for(const side of [1,-1]){
+        const target={x:(a.x+b.x)/2,z:(a.z+b.z)/2};
+        const base={x:target.x-dz/length*2.55*side,z:target.z+dx/length*2.55*side};
+        const yaw=Math.atan2(target.x-base.x,target.z-base.z)-Math.PI;
+        if(addFixture('street-lamp',base,yaw,{edge:[aId,bId],target})){lampCount++;break;}
+      }
+    }
+    const junctions=map.nodes.filter(n=>map.edges.filter(edge=>edge.includes(n.id)).length>=3);
+    let signPlaced=false,signalPlaced=false;
+    for(const junction of junctions){
+      const approaches=map.edges.filter(edge=>edge.includes(junction.id)).map(edge=>{
+        const neighbor=nodes.get(edge.find(id=>id!==junction.id)),length=Math.hypot(neighbor.x-junction.x,neighbor.z-junction.z);
+        return {node:neighbor,x:(neighbor.x-junction.x)/length,z:(neighbor.z-junction.z)/length};
+      });
+      if(!signPlaced)for(const sx of [-1,1])for(const sz of [-1,1]){
+        if(signPlaced||!approaches.some(a=>a.x===-sx)||!approaches.some(a=>a.z===-sz))continue;
+        const base={x:junction.x+sx*2.15,z:junction.z+sz*2.15};
+        const yaw=Math.atan2(-sx,-sz)-Math.PI/4;
+        signPlaced=addFixture('town-road-sign',base,yaw,{junctionId:junction.id,edges:approaches.filter(a=>a.x===-sx||a.z===-sz).map(a=>[junction.id,a.node.id])});
+      }
+      if(!signalPlaced)for(const approach of approaches)for(const side of [1,-1]){
+        if(signalPlaced)continue;
+        const base={x:junction.x+approach.x*2.9-approach.z*2.05*side,z:junction.z+approach.z*2.9+approach.x*2.05*side};
+        const yaw=Math.atan2(approach.x,approach.z)-Math.PI/2;
+        signalPlaced=addFixture('town-traffic-light',base,yaw,{junctionId:junction.id,edge:[junction.id,approach.node.id],approachNodeId:approach.node.id});
+      }
+      if(signPlaced&&signalPlaced)break;
+    }
     map.edges.forEach(([aId,bId], index)=>{
       const a=nodes.get(aId),b=nodes.get(bId);if(!a||!b)return;
       const dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz);
@@ -317,10 +388,6 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
       for(const t of [0,-6,6,-11,11])for(const [x,z,rotation]of [[boardBounds.minX+2.3,boardZ+t,Math.PI/2],[boardBounds.maxX-2.3,boardZ+t,-Math.PI/2],[boardX+t,boardBounds.minZ+2.3,0],[boardX+t,boardBounds.maxZ-2.3,Math.PI]]){
         if(streetSpots.length<streetKinds.length)addStreetSpot(x,z,rotation);
       }
-    }
-    if(lookup('town-traffic-light')){
-      const junction=map.nodes.find(n=>map.edges.filter(e=>e.includes(n.id)).length>=3&&gardenCenters.every(p=>Math.hypot(p.x-(n.x+2.3),p.z-(n.z-2.3))>3.4));
-      if(junction)streetDecoration('town-traffic-light',[junction.x+2.3,.12,junction.z-2.3],1.15,Math.PI/2);
     }
     if(theme==='farm'){
       // A cultivated strip outside the occupied town plots; paths and lots stay clear.
@@ -345,7 +412,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     const parked=initialParkingPose(map,depot?.id||'depot');
     position.set(parked.x,.2,parked.z);location=depot?.id||'depot';parkingHeading=parked.yaw;
     if(vehicle){vehicle.position.copyFrom(position);vehicle.rotation.y=parkingHeading;}
-    aim.copyFrom(mapFocus);camera.beta=.92;camera.setTarget(aim);overviewMode=true;
+    aim.copyFrom(mapFocus);camera.beta=.92;camera.setTarget(aim);
     // Fit the rendered island and building bounds in camera space. The old
     // radius multiplier left large empty corners, especially beside the sidebar.
     let left=Infinity,right=-Infinity,bottom=Infinity,top=-Infinity;
@@ -360,6 +427,7 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
     }
     framing={halfWidth:Math.max(Math.abs(left),Math.abs(right))+1.1,halfHeight:Math.max(Math.abs(bottom),Math.abs(top))+1.1};
     mapRoot.setEnabled(!previewId);
+    aim.copyFrom(neighborhoodFocus());camera.setTarget(aim);
     fitCamera();
   }
   function fitCamera(dt=0) {
@@ -380,8 +448,9 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
       }
     }else {
       const townHalfHeight=Math.max(framing.halfHeight, framing.halfWidth / aspect);
-      // Keep route selection wide; show the car and nearby streets while driving.
-      targetHalfHeight=townHalfHeight*(overviewMode?1:.55);
+      // Destination cards make a full-town zoom unnecessary. Keep the same
+      // neighbourhood scale while packing, choosing, driving and delivering.
+      targetHalfHeight=townHalfHeight*.55;
     }
     currentHalfHeight=dt?currentHalfHeight+(targetHalfHeight-currentHalfHeight)*(1-Math.exp(-dt*3)):targetHalfHeight;
     // Off-centre projection fits the town into its own rectangle. Keeping the
@@ -515,20 +584,23 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
       cargoKey=key;
       if(old&&old.seed===next.seed&&old.vehicleId===next.vehicleId)animateCargo(old.cargo,next.cargo);
     }
-    if(old?.phase==='loading'&&next.phase==='explore')overview();
     if(old?.phase==='event'&&next.phase!=='event')burst('success',position,14);
   }
   function travel(points, placeId) {
     if(paused||moving||!Array.isArray(points)||!points.length)return;
-    // Logical destinations stay at road nodes; physical stops leave enough
-    // straight approach for the complete car and its next rounded turn.
-    const parkedRoute=planParkingRoute(map,points,{position:{x:position.x,z:position.z},heading:vehicle?.rotation.y||0});
+    // Physical travel ends at the destination entrance, independent of arrival direction.
+    const parkedRoute=planParkingRoute(map,points,{position:{x:position.x,z:position.z},heading:vehicle?.rotation.y||0},{placeId,blockedEdges:state?.blockedEdges||[]});
     motion=createRoadMotion(buildRoadPath(parkedRoute.points));destination=placeId;moving=true;
     const from=vehicle?.rotation.y||0,delta=Math.atan2(Math.sin(motion.yaw-from),Math.cos(motion.yaw-from));
     departureTurn=!reducedMotion&&Math.abs(delta)>.025?{from,delta,time:0,duration:Math.max(.2,Math.abs(delta)/3.8)}:null;
-    overviewMode=false;burst('dust',position,10);
+    burst('dust',position,10);
   }
-  function overview(){overviewMode=true;}
+  function neighborhoodFocus(){
+    const landmark=!moving&&placement.get(location);
+    // At a stop, frame both the car and the building served by this entrance.
+    // During a trip follow the car; neither transition changes magnification.
+    return landmark?new Vector3(position.x*.55+landmark.x*.45,.8,position.z*.55+landmark.z*.45):new Vector3(position.x,.8,position.z);
+  }
   function effect(kind){if(kind==='rain'||kind==='weather')rainTime=5;else burst(kind==='start'?'dust':kind,position,['reward','celebrate'].includes(kind)?32:kind==='cargo'?5:8);}
   function update(dt) {
     dt=Math.min(Math.max(Number(dt)||0,0),.1);
@@ -545,10 +617,10 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
       }else{advanceRoadMotion(motion,dt);position.set(motion.x,.2,motion.z);vehicle.rotation.y=motion.yaw;}
       vehicle.position.copyFrom(position);
       travelDust+=dt;if(travelDust>.24){travelDust=0;burst('dust',position,2);}
-      if(motion.done){moving=false;location=destination;destination=null;overview();burst('stop',position,8);onArrival(location);}
+      if(motion.done){moving=false;location=destination;destination=null;burst('stop',position,8);onArrival(location);}
     }
     if(vehicle){vehicle.rotation.x=cargoFeedback;vehicle.rotation.z=-cargoFeedback*.55;}
-    const cameraTarget=overviewMode?mapFocus:position;
+    const cameraTarget=neighborhoodFocus();
     aim.copyFrom(Vector3.Lerp(aim,cameraTarget,reducedMotion?1:1-Math.exp(-dt*4)));camera.setTarget(aim);
     if(weatherTime>65+(map?.seed%20||0)){weatherTime=0;rainTime=5;}
     if(rainTime>0){rainTime-=dt;if(!reducedMotion&&Math.floor(clock*15)!==Math.floor((clock-dt)*15))burst('rain',aim,3);}
@@ -612,11 +684,11 @@ export function createWorld(scene, { assets, onPlaceTap = () => {}, onArrival = 
   canvas?.addEventListener('pointercancel',cancel);canvas?.addEventListener('lostpointercapture',cancel);
   const resizeObserver=engine.onResizeObservable.add(()=>fitCamera());
   return {
-    setMap,sync,travel,update,overview,effect,projectPlaces,setLayout,setModelPreview,
+    setMap,sync,travel,update,effect,projectPlaces,setLayout,setModelPreview,
     cancelInput(){pressed=null;heldPointers.clear();multiPointerGesture=false;},
     setPaused(value){paused=!!value;pressed=null;},
     setReducedMotion(value){reducedMotion=!!value;if(value){for(const p of particles.particles)p.isVisible=false;particles.setParticles();}},
-    getState(){return {parkedVehicleIds:[...parkedVehicleIds],streetInfo:{...streetInfo,decorationIds:[...streetInfo.decorationIds],roadModelIds:[...streetInfo.roadModelIds],roadworkModelIds:roadworkInstances.length?['street-fence','street-cone']:[]},position:{x:position.x,y:position.y,z:position.z},moving,location,vehicleId,speed:motion?.speed||0,heading:vehicle?.rotation.y||0,curvature:motion?.curvature||0,cargoAnimation:cargoAnimation?{time:cargoAnimation.time,count:cargoAnimation.items.length}:null,cargoMeshCount:cargoRoot?.getChildMeshes().length||0,meshCount:scene.meshes.length,orphanMeshCount:scene.meshes.filter(m=>m!==particleMesh&&!m.metadata?.modelPreview&&!m.isDescendantOf(mapRoot)&&!m.isDescendantOf(vehicle)).length,particleCount:particles.particles.filter(p=>p.isVisible).length,particleLimit:96,weather:rainTime>0?'rain':'clear',preview:{...modelPreview.getState(),zoom:previewZoom},camera:{overview:overviewMode,halfHeight:currentHalfHeight,target:{x:aim.x,z:aim.z}},theme:map?.theme,landmarks:[...placement].map(([id,p])=>({id,x:p.x,z:p.z,height:p.height,rotation:p.rotation}))};},
+    getState(){return {parkedVehicleIds:[...parkedVehicleIds],streetInfo:{...streetInfo,fixturePlacements:JSON.parse(JSON.stringify(streetInfo.fixturePlacements)),decorationIds:[...streetInfo.decorationIds],roadModelIds:[...streetInfo.roadModelIds],roadworkModelIds:roadworkInstances.length?['street-fence','street-cone']:[]},position:{x:position.x,y:position.y,z:position.z},moving,location,vehicleId,speed:motion?.speed||0,heading:vehicle?.rotation.y||0,curvature:motion?.curvature||0,cargoAnimation:cargoAnimation?{time:cargoAnimation.time,count:cargoAnimation.items.length}:null,cargoMeshCount:cargoRoot?.getChildMeshes().length||0,meshCount:scene.meshes.length,orphanMeshCount:scene.meshes.filter(m=>m!==particleMesh&&!m.metadata?.modelPreview&&!m.isDescendantOf(mapRoot)&&!m.isDescendantOf(vehicle)).length,particleCount:particles.particles.filter(p=>p.isVisible).length,particleLimit:96,weather:rainTime>0?'rain':'clear',preview:{...modelPreview.getState(),zoom:previewZoom},camera:{mode:'neighborhood',overview:false,halfHeight:currentHalfHeight,focus:{x:neighborhoodFocus().x,y:.8,z:neighborhoodFocus().z},target:{x:aim.x,z:aim.z}},theme:map?.theme,landmarks:[...placement].map(([id,p])=>({id,x:p.x,z:p.z,height:p.height,rotation:p.rotation}))};},
     dispose(){
       scene.onPointerObservable.remove(observer);engine.onResizeObservable.remove(resizeObserver);
       canvas?.removeEventListener('pointercancel',cancel);canvas?.removeEventListener('lostpointercapture',cancel);

@@ -2,6 +2,7 @@
 """New Mini destinations, transient cargo and actual rendered turning samples."""
 import asyncio,json,math
 from playwright.async_api import async_playwright
+from v2_map_variety import assert_neighborhood, entrance_stop
 from v2_browser import OUT,URL,snap,state,click,prepare,fill,phase,is_game_request
 
 async def run():
@@ -32,26 +33,30 @@ async def run():
     await click(p,'depart')
     await p.wait_for_function('(()=>{const s=window.__townTest.snapshot();return s.state.map.places.every(p=>s.bounds["place-"+p.id])})()',timeout=15000)
     s=await snap(p)
-    assert s['world']['camera']['overview'] and 'overview' not in s['bounds']
+    assert_neighborhood(s);near_height=s['world']['camera']['halfHeight']
+    assert 'overview' not in s['bounds']
     assert all(p['rotation']==0 for p in s['world']['landmarks']),'landmark fronts must face the fixed camera'
     assert all('place-'+place['id'] in s['bounds'] for place in s['state']['map']['places'])
     await p.screenshot(path=str(OUT/f'mini-town-{place}.png'))
     # Observe the real rendered game; no game-state mutation or instant travel.
-    await p.evaluate('''()=>{window.motionSamples=[];window.sampleTrip=true;function sample(){if(!window.sampleTrip)return;const s=window.__townTest.snapshot();if(s.world.moving)window.motionSamples.push({position:s.world.position,heading:s.world.heading,speed:s.world.speed,curvature:s.world.curvature});requestAnimationFrame(sample)}requestAnimationFrame(sample)}''')
+    await p.evaluate('''()=>{window.motionSamples=[];window.sampleTrip=true;function sample(){if(!window.sampleTrip)return;const s=window.__townTest.snapshot();if(s.world.moving)window.motionSamples.push({position:s.world.position,heading:s.world.heading,speed:s.world.speed,curvature:s.world.curvature,camera:s.world.camera});requestAnimationFrame(sample)}requestAnimationFrame(sample)}''')
     await click(p,'place-'+place);await phase(p,'delivery')
     samples=await p.evaluate('()=>{window.sampleTrip=false;return window.motionSamples}')
     assert samples and any(s['speed']>0 for s in samples)
     changes=[abs(math.atan2(math.sin(b['heading']-a['heading']),math.cos(b['heading']-a['heading']))) for a,b in zip(samples,samples[1:])]
     assert max(changes,default=0)<math.pi/2,'turns must not snap a right angle in one update'
     if place=='shop':assert any(abs(s['curvature'])>.01 for s in samples),'bent route must visibly use an arc'
-    assert (await snap(p))['world']['speed']==0
+    arrived=await snap(p);assert arrived['world']['speed']==0
+    assert_neighborhood(arrived,near_height);entrance_stop(arrived,place)
+    assert all(not sample['camera']['overview'] and sample['camera']['mode']=='neighborhood' and abs(sample['camera']['halfHeight']-near_height)<1e-4 for sample in samples)
+    assert all(all(abs(sample['camera']['focus'][axis]-sample['position'][axis])<1e-4 for axis in ('x','z')) and abs(sample['camera']['focus']['y']-.8)<1e-4 for sample in samples)
     for _ in range(step['quantity']):await click(p,'deliver-'+step['goodId'])
     await phase(p,'reward')
     await p.wait_for_function('window.__townTest.snapshot().world.cargoMeshCount===0',timeout=30000)
     assert not (await state(p))['cargo']
     assert len(requests)==count,requests[count:]
     reports.append({'seed':seed,'destination':place,'sampleCount':len(samples),'maxHeadingStepRadians':max(changes,default=0),'samples':samples,'offlineRequests':0,'reward':True})
-    print('PASS',place,'offline task, cargo pause/cleanup, automatic overview, smooth travel',flush=True)
+    print('PASS',place,'offline task, cargo pause/cleanup, fixed neighborhood camera, smooth travel',flush=True)
     p.remove_listener('request',record)
    assert not errors,errors
   finally:

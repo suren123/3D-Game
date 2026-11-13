@@ -48,16 +48,16 @@ async def run():
    baseline=len(requests)
    await click(p,'start');await prepare(p);await fill(p);await click(p,'depart')
    await p.wait_for_function('!!window.__townTest.snapshot().bounds["place-shop"]')
-   s=await snap(p);assert s['world']['camera']['overview']
+   s=await snap(p);assert s['world']['camera']['mode']=='neighborhood' and not s['world']['camera']['overview']
    assert all(x['rotation']==0 for x in s['world']['landmarks'])
    await p.screenshot(path=str(OUT/'live-mini-town.png'))
    step=s['state']['mission']['steps'][0];assert step['placeId']=='shop'
    wide=s['world']['camera']['halfHeight']
    await click(p,'place-shop')
-   await p.wait_for_function('(h)=>{const w=window.__townTest.snapshot().world;return w.moving&&!w.camera.overview&&w.camera.halfHeight<h*.7}',arg=wide,timeout=45000)
+   await p.wait_for_function('(h)=>{const w=window.__townTest.snapshot().world;return w.moving&&!w.camera.overview&&Math.abs(w.camera.halfHeight-h)<.02}',arg=wide,timeout=45000)
    await p.screenshot(path=str(OUT/'live-driving-camera.png'))
    await phase(p,'delivery')
-   assert (await snap(p))['world']['camera']['overview']
+   assert abs((await snap(p))['world']['camera']['halfHeight']-wide)<.02
    for _ in range(step['quantity']):await click(p,'deliver-'+step['goodId'])
    await phase(p,'reward')
    await p.wait_for_function('window.__townTest.snapshot().world.cargoMeshCount===0',timeout=30000)
@@ -69,7 +69,7 @@ async def run():
    assert (await state(p))['phase']=='reward' and not (await state(p))['paused']
    assert len(requests)==baseline,requests[baseline:]
    assert not errors,errors
-   print('PASS live current bundle, all current models/icons/voices, driving zoom, direct shop delivery, cargo cleanup, model viewer, no later requests',flush=True)
+   print('PASS live current bundle, all current models/icons/voices, constant close camera, direct shop delivery, cargo cleanup, model viewer, no later requests',flush=True)
   finally:
    try:(OUT/'live-mini-verification.json').write_text(json.dumps({'url':BASE,'bundle':expected,'status':status,'requests':requests,'errors':errors,'snapshot':await snap(p),'transport':'Actual deployed HTTPS responses using system CA verification; no local assets substituted.','limitations':'Software Chromium, no physical iPad test.'},ensure_ascii=False,indent=2))
    finally:await browser.close()

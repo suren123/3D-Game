@@ -33,9 +33,9 @@ state 至少：`{seed,difficulty,map,phase,round:0,mission,vehicleId,location:'d
 
 ## World（纯表现，禁止发奖励）
 
-`createWorld(scene,{assets,onPlaceTap,onArrival,reducedMotion=false})` → `{setMap(map),sync(state),travel(route,placeId),update(dt),setPaused(bool),overview(),setModelPreview(id|null,zoom),effect(kind),getState(),dispose()}`。scene 为 root 创建的 Babylon Scene；world 创建 camera/light。assets 为已加载模型 AssetContainer Map，key 支持 vehicle IDs 与 building/tree 等；不得在 World 内发任何网络请求。模型实际所需 keys 与 root 协调。
+`createWorld(scene,{assets,onPlaceTap,onArrival,reducedMotion=false})` → `{setMap(map),sync(state),travel(route,placeId),update(dt),setPaused(bool),setModelPreview(id|null,zoom),effect(kind),getState(),dispose()}`。scene 为 root 创建的 Babylon Scene；world 创建 camera/light。assets 为已加载模型 AssetContainer Map，key 支持 vehicle IDs 与 building/tree 等；不得在 World 内发任何网络请求。模型实际所需 keys 与 root 协调。
 
-setMap 必须清理上一地图实例/粒子，复用材质与容器；车辆真正在合法道路上行驶，完成再 onArrival。点地点依靠 mesh.metadata.placeId + root/scene拾取，扩大透明拾取域>=80px（或 UI投影热点）。相机固定角度，装好出发自动全镇，驾驶平滑拉近到全镇视野的55%并跟随车，到达后回到全镇。任务建筑正面不得背对镜头。`getState()` 含 position/moving/location/meshCount/particleCount；可额外提供 `projectPlaces()` 给 GUI，返回像素坐标与 id（先通知 UI）。地图占据屏幕中部大部分；大城市感但视觉不挤。出发/停车/雨/成功粒子有上限，暂停冻结。
+setMap 必须清理上一地图实例/粒子，复用材质与容器；车辆真正在合法道路上行驶，完成再 onArrival。点地点依靠 mesh.metadata.placeId + root/scene拾取，扩大透明拾取域>=80px（或 UI投影热点）。相机固定角度与近景比例（全镇包围框视野的55%），选地点使用右侧图卡；行驶平滑跟车，到站平移取车辆与当前地标的加权中点，不来回缩放。任务建筑正面不得背对镜头。`getState()` 含 position/moving/location/meshCount/particleCount；可额外提供 `projectPlaces()` 给 GUI，返回像素坐标与 id（先通知 UI）。地图占据屏幕中部大部分；大城市感但视觉不挤。出发/停车/雨/成功粒子有上限，暂停冻结。
 
 ## UI（只用 Babylon GUI，禁止 HTML 游戏控件）
 
@@ -59,8 +59,8 @@ onSpeak() 重放当前完整任务，onSound(bool)，onReducedMotion(bool)，onN
 
 ## 物理停车与道路接口（2026-11-13）
 
-Rules保留`place.nodeId/x/z`与原来的图节点寻路。World通过`parking-route.js`把规则路点适配到实际车位：到达前在最后直路距离节点3米处停稳，不把整车中心放在尽端封边或圆弯中央。初始仓库车位在该建筑真实临街边上，车头朝逻辑节点；换车保留实际位置与朝向。
+Rules保留`place.nodeId/x/z`与原来的图节点寻路。World通过`parking-route.js`将当前物理位置和目标地点入口在临街道路上的投影作为虚拟顶点，重新计算开放道路最短路径；到达地点固定入口位置，不受最后来向影响。初始仓库车位在该建筑真实临街边上，车头朝逻辑节点；换车保留实际位置与朝向。
 
-`initialParkingPose(map,placeId)`返回`{x,z,yaw,nodeId,edge}`；`planParkingRoute(map,nodeRoute,{position,heading})`返回`{points,stop,removedStartNode,headingOffset:0}`。已有车位若在首条离开道路上，去掉多余逻辑首节点，避免驶回路口再折返。Motion首尾边保留完整2.5米转弯半径，中间相邻转弯保留不交叠约束。
+`initialParkingPose(map,placeId)`返回`{x,z,yaw,nodeId,edge}`；`planParkingRoute(map,nodeRoute,{position,heading},{placeId,blockedEdges})`返回`{points,stop,removedStartNode,headingOffset:0}`。将当前与目标车位插入所属路段，避免先去错误的逻辑路口；封路事件保留所有地点入口道路，不把围栏放在实际车位上。Motion首尾边保留完整2.5米转弯半径，中间相邻转弯保留不交叠约束。
 
 道路/实际车身包络检查覆盖平移行驶、连续圆弧与停稳姿态；原有起步180°原地缓慢调向仍可能有车身外摆，不把本轮适配称作完整碰撞或三点调头系统。

@@ -18,6 +18,11 @@ async def center(p,key):
  await p.wait_for_function('(k)=>!!window.__townTest?.snapshot().bounds?.[k]',arg=key,timeout=15000)
  b=(await snap(p))['bounds'][key];return b['x']+b['width']/2,b['y']+b['height']/2
 async def click(p,key):
+ cargo_action=key.startswith(('load-','unload-','cargo-slot-'))
+ if key.startswith('unload-'):
+  prefix='cargo-slot-'+key[len('unload-'): ]+'-'
+  await p.wait_for_function('(prefix)=>Object.keys(window.__townTest.snapshot().bounds).some(k=>k.startsWith(prefix))',arg=prefix,timeout=15000)
+  key=next(k for k in (await snap(p))['bounds'] if k.startswith(prefix))
  if key in ('listen','destinations') and key not in (await snap(p))['bounds']:
   # These secondary actions now live inside the child's single help panel.
   await click(p,'hint')
@@ -29,6 +34,7 @@ async def click(p,key):
    await click(p,'next-vehicles')
    await p.wait_for_function('!!window.__townTest.snapshot().bounds["next-vehicles"]')
  x,y=await center(p,key);await p.touchscreen.tap(x,y);await p.wait_for_timeout(120)
+ if cargo_action:await p.wait_for_function('!window.__townTest.snapshot().cargoTransfer?.active',timeout=15000)
 # Long routes need extra wall time on the cloud's software renderer.
 async def phase(p,value):await p.wait_for_function('(v)=>window.__townTest.snapshot().state.phase===v',arg=value,timeout=180000)
 async def travel(p,place):

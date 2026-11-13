@@ -64,6 +64,10 @@ export function findRoute(map, fromPlaceId, toPlaceId, blockedEdges = []) {
   const from = map.places.find(place => place.id === fromPlaceId);
   const to = map.places.find(place => place.id === toPlaceId);
   if (!from || !to) return [];
+  const blocked = new Set(blockedEdges.map(edge => Array.isArray(edge) ? edgeKey(edge) : edge));
+  // A reachable logical junction is insufficient if its actual entrance road
+  // is closed. Roadworks normally reserve all landmark frontages.
+  if ([from, to].some(place => place.lot?.accessEdge && blocked.has(edgeKey(place.lot.accessEdge)))) return [];
   const nodes = byId(map.nodes);
   return nodeRoute(map, from.nodeId, to.nodeId, blockedEdges).map(id => ({ x: nodes[id].x, z: nodes[id].z }));
 }
@@ -164,7 +168,12 @@ export function createGame({ seed = 1, difficulty = 'easy', saved = {} } = {}) {
       const route = nodeRoute(state.map, from, to);
       const routeEdges = route.slice(1).map((node, i) => [route[i], node]);
       const candidates = [...routeEdges, ...state.map.edges];
-      const blocked = candidates.find(edge => state.map.nodes.every(node => nodeRoute(state.map, from, node.id, [edge]).length));
+      // Every parked vehicle and destination sits midway along a frontage.
+      // Reserve these roads so a full-edge closure cannot strand a vehicle or
+      // put a barrier across a landmark entrance. Other roads retain a detour.
+      const frontages = new Set(state.map.places.map(place => edgeKey(place.lot.accessEdge)));
+      const blocked = candidates.find(edge => !frontages.has(edgeKey(edge)) &&
+        state.map.nodes.every(node => nodeRoute(state.map, from, node.id, [edge]).length));
       if (blocked) state.blockedEdges = [blocked];
     } else if (definition.id === 'capacity') {
       state.capacityBonus = 1 - vehicles[state.vehicleId].capacity;

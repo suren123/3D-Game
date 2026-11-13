@@ -2,6 +2,7 @@
 """Final resource/vehicle/preload-failure/storage checks through actual Canvas touches."""
 import asyncio,json,subprocess,sys
 from playwright.async_api import async_playwright
+from v2_map_variety import assert_neighborhood
 from v2_browser import ROOT,OUT,URL,snap,state,click,fill,finish,phase,VEHICLES,is_game_request
 CARGO_ONLY='--cargo-only' in sys.argv
 plans=json.loads(subprocess.check_output(['node','--input-type=module','-e',"import{createGame}from'./src/v2/rules.js';import{VEHICLES}from'./src/v2/catalog.js';console.log(JSON.stringify(VEHICLES.map(v=>{for(let seed=0;seed<1000;seed++){const s=createGame({seed}).getState();if(s.mission.vehicleChoices.includes(v.id)&&s.mission.requiredTags.every(t=>v.supports.includes(t)))return {id:v.id,seed};}throw Error(v.id)})))"],cwd=ROOT,text=True))
@@ -27,7 +28,8 @@ async def run():
    await fill(p)
    await p.wait_for_function('window.__townTest.snapshot().world.cargoMeshCount===0',timeout=30000)
    await click(p,'depart');s=await snap(p)
-   assert s['world']['camera']['overview'] and s['world']['cargoMeshCount']==0
+   assert_neighborhood(s)
+   assert s['world']['cargoMeshCount']==0
    assert s['resources']['icons']==len(s['manifest']['icons'])
    assert s['world']['vehicleId']==plan['id']
    assert s['vehicleMaterials'] and all(m['kind']=='PBRMaterial' and m['lights']==2 for m in s['vehicleMaterials'])

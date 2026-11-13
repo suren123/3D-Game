@@ -63,9 +63,9 @@ function builder() {
   }
   function window(x,y,z,w=.65,h=.65) {box('white',x,y,z,w+.14,h+.14,.13);box('glass',x,y,z-.08,w,h,.07);}
   function door(x,z,y=.72) {box('white',x,y,z,.91,1.55,.17);box('navy',x,y,z-.1,.70,1.40,.08);box('yellow',x+.21,y,z-.16,.1,.12,.05);}
-  function house(w=3,h=2.4,d=2.5,wall='cream',top='coral'){
+  function house(w=3,h=2.4,d=2.5,wall='cream',top='coral',withDoor=true){
     box('white',0,.11,0,w+.35,.22,d+.35);box(wall,0,h/2+.22,0,w,h,d);roof(top,0,h+.22,0,w+.4,.85,d+.4);
-    door(0,-d/2-.06);window(-w*.3,1.5,-d/2-.07,.55,.7);window(w*.3,1.5,-d/2-.07,.55,.7);
+    if(withDoor)door(0,-d/2-.06);window(-w*.3,1.5,-d/2-.07,.55,.7);window(w*.3,1.5,-d/2-.07,.55,.7);
     box('cream',w*.28,h+.8,.25,.4,1,.42);
   }
   async function save(id) {
@@ -134,11 +134,15 @@ for(const id of ['depot','park','school','hospital','farm','cafe','garage','hous
     box('white',0,3.9,0,1.55,1.5,.35);box('coral',0,3.9,-.23,1.13,.36,.16);box('coral',0,3.9,-.23,.36,1.13,.16);
     box('coral',0,3.39,.65,1.18,.12,.36);box('coral',0,3.4,.65,.36,.13,1.18);
   }else if(id==='farm'){
-    house(3.2,2.3,2.7,'coral','cream');box('white',0,1,-1.44,1.25,1.8,.1);box('brown',0,.95,-1.51,1.05,1.6,.08);
+    // The barn supplies its own door: the inherited navy house door occupied
+    // exactly the same front/back planes as this brown door and z-fought.
+    house(3.2,2.3,2.7,'coral','cream',false);box('white',0,1,-1.44,1.25,1.8,.1);box('brown',0,.95,-1.51,1.05,1.6,.08);
     for(const x of [-1.85,1.85]){cylinder('yellow',x,.4,.5,.35,.8,.35,10);box('cream',x,.4,.5,.75,.1,.1);}
     for(let i=0;i<3;i++){box('brown',1.95,.05,-1+i*.5,.5,.12,.27);ball('leaf',1.95,.28,-1+i*.5,.24,1,.8,.6);}
     // White barn-door braces and a roof rooster-like weather vane.
-    box('white',-.26,1,-1.59,.12,1.5,.07,0,-.55);box('white',.26,1,-1.59,.12,1.5,.07,0,.55);
+    // Seat both braces into the panel and stagger their front planes by 1cm:
+    // crossing timbers must not contribute duplicate coplanar front triangles.
+    box('white',-.26,1,-1.57,.12,1.5,.07,0,-.55);box('white',.26,1,-1.58,.12,1.5,.07,0,.55);
     cylinder('brown',0,3.7,0,.045,.6,.045,6);ball('yellow',0,4.02,0,.21,1.5,1,.5);ball('coral',.26,4.2,0,.1);
   }else if(id==='cafe'){
     house(3.1,2.3,2.7,'pink','teal');for(let i=0;i<7;i++)box(i%2?'white':'coral',-1.35+i*.45,1.86,-1.68,.45,.22,.9);

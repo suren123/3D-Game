@@ -1,11 +1,38 @@
 {
   "id": "camp",
   "file": "camp.glb",
-  "distributedSha256": "c9bce93a737b5040b3f6c4a4204a19c660d0a2388237a091e988219ae7161510",
-  "bytes": 173748,
+  "distributedSha256": "7f65f54e44f58d91ea8377a04281cb8521d36a35b23db8256223200ae9185ba9",
+  "bytes": 173728,
   "projectBase": {
     "file": "_sources/camp-base.glb",
-    "sha256": "3b2e52119f0c47a60b2b4ccaa7356e4ed60ddf7d59d571c1f355f758835ef93d"
+    "sha256": "3b2e52119f0c47a60b2b4ccaa7356e4ed60ddf7d59d571c1f355f758835ef93d",
+    "primitiveTranslations": {
+      "brown": [
+        0.2,
+        0.14,
+        0.1
+      ],
+      "cream": [
+        0.2,
+        0.14,
+        0.1
+      ],
+      "bark": [
+        0.4,
+        0.14,
+        -0.3
+      ]
+    },
+    "stoolAdjustment": {
+      "sourceMaterial": "bark",
+      "sourceVertexSelection": "x < 0",
+      "additionalTranslation": [
+        1.6,
+        0,
+        1.25
+      ],
+      "reason": "Clear the world -Z entrance; place the one front stool in the left-side gap"
+    }
   },
   "sourceLayers": [
     {
@@ -21,7 +48,7 @@
         -0.1
       ],
       "uniformScale": 4.1,
-      "rotationY": 0.7853981633974483,
+      "rotationY": 0,
       "materialPolicy": "metallicFactor 1 -> 0 for Nature cloth/wood only; original colors and roughness preserved"
     },
     {
@@ -89,5 +116,5 @@
       "materialPolicy": "preserved"
     }
   ],
-  "modification": "Use open matte Nature tent; separate trees/flag/stones and crate/stools without triangle crossings; all props sit on platform; Mini tent retained historically but not in runtime camp"
+  "modification": "Keep the open matte Nature tent entrance aligned to Babylon world -Z like the other buildings (source rotationY 0); move only the doorway stool to the free left-side gap; preserve tent scale/colors and other props; all feet sit on platform; Mini tent retained historically but not in runtime camp"
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tap all 27 world buildings offline; snapshots are read-only.
+"""Reach all 27 landmarks through cards, then tap their visible buildings offline.
 
 Run serially with other GPU tests, e.g. TOWN_URL=http://127.0.0.1:4173/
 python tests/v2_landmark_taps.py. TOWN_EXPECT_BUNDLE optionally pins a bundle
@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from playwright.async_api import async_playwright
+from v2_map_variety import stable_neighborhood, assert_neighborhood, entrance_stop
 from v2_browser import ROOT, URL, click, is_game_request, prepare, snap
 
 OUT = ROOT / 'artifacts' / 'goal' / 'landmark-taps'
@@ -40,36 +41,6 @@ def write_json(path, value):
 def contains(box, point):
     return (box['x'] <= point['x'] <= box['x'] + box['width']
             and box['y'] <= point['y'] <= box['y'] + box['height'])
-
-
-async def settled_overview(page):
-    """Wait for actual rendered frames, not a guessed post-departure delay."""
-    deadline = time.monotonic() + 90
-    previous = None
-    stable = 0
-    while time.monotonic() < deadline:
-        shot = await snap(page)
-        camera = shot['world']['camera']
-        bounds = shot['state']['map']['layout']['bounds']
-        centered = (abs(camera['target']['x'] - (bounds['minX'] + bounds['maxX']) / 2) < .05
-                    and abs(camera['target']['z'] - (bounds['minZ'] + bounds['maxZ']) / 2) < .05)
-        eligible = (shot['state']['phase'] == 'explore' and not shot['state']['paused']
-                    and not shot['world']['moving'] and camera['overview'] and centered)
-        numbers = [camera['halfHeight'], camera['target']['x'], camera['target']['z']]
-        for place in sorted(shot['places'], key=lambda place: place['id']):
-            numbers.extend((place['building']['x'], place['building']['y']))
-        frame = shot['frames']
-        if eligible and previous and frame != previous['frame']:
-            delta = max(abs(a - b) for a, b in zip(numbers, previous['numbers'])) if len(numbers) == len(previous['numbers']) else math.inf
-            stable = stable + 1 if delta < .05 else 0
-            if stable >= 3:
-                return shot
-        elif not eligible:
-            stable = 0
-        if previous is None or frame != previous['frame']:
-            previous = {'frame': frame, 'numbers': numbers}
-        await page.wait_for_timeout(200)
-    raise AssertionError('Overview/building coordinates did not settle within 90 seconds')
 
 
 async def run_case(browser, seed, target):
@@ -114,11 +85,22 @@ async def run_case(browser, seed, target):
         result['vehicleId'] = await prepare(page)
         assert not (await snap(page))['state']['cargo'], 'Expected empty departure'
         await click(page, 'depart')
-        before = await settled_overview(page)
+        before = await stable_neighborhood(page)
         assert before['state']['seed'] == seed, before['state']['seed']
         assert before['state']['location'] == 'depot', before['state']
         assert not before['state']['cargo'], before['state']['cargo']
         assert {place['id'] for place in before['state']['map']['places']} == set(PLACES)
+        near_height = before['world']['camera']['halfHeight']
+        # The near view cannot show all nine buildings. Use the nine real cards
+        # to visit each place, then test the building now beside the parked car.
+        if target != 'depot':
+            await click(page, 'place-' + target)
+            await page.wait_for_function('(id)=>{const s=window.__townTest.snapshot();return s.state.location===id&&!s.world.moving}', arg=target, timeout=240000)
+            assert (await snap(page))['state']['phase'] == 'delivery'
+        before = await stable_neighborhood(page)
+        assert before['state']['location'] == target
+        assert_neighborhood(before, near_height, settled=True)
+        result['arrivalStop'] = entrance_stop(before, target)
         projected = {place['id']: place for place in before['places']}
         assert set(projected) == set(PLACES), sorted(projected)
         landmark = projected[target]
@@ -143,19 +125,22 @@ async def run_case(browser, seed, target):
             await page.touchscreen.tap(point['x'], point['y'])
         else:
             await page.mouse.click(point['x'], point['y'])
-        # Observe any state change first, so a wrong destination fails immediately.
-        await page.wait_for_function('window.__townTest.snapshot().state.phase !== "explore"', timeout=15000)
+        # A current-place tap must run the existing TRAVEL behavior: depot
+        # reopens loading; other landmarks acknowledge arrival without a trip.
+        expected_message = '还可以补货或放回物品。' if target == 'depot' else '已经到了。选一件要交出的物品吧。'
+        await page.wait_for_function('(message)=>window.__townTest.snapshot().state.message===message', arg=expected_message, timeout=15000)
         after = await snap(page)
         state = after['state']
         result['observed'] = {'phase': state['phase'], 'location': state['location'],
                               'currentDestination': state['currentDestination'],
                               'worldMoving': after['world']['moving'], 'message': state['message']}
-        if target == 'depot':
-            assert state['phase'] == 'loading' and state['location'] == 'depot', result['observed']
-            assert state['currentDestination'] is None and not after['world']['moving'], result['observed']
-        else:
-            assert state['phase'] == 'moving' and state['currentDestination'] == target, result['observed']
-            assert after['world']['moving'], result['observed']
+        assert state['phase'] == ('loading' if target == 'depot' else 'delivery'), result['observed']
+        assert state['location'] == target and state['currentDestination'] is None, result['observed']
+        assert not after['world']['moving'] and after['world']['speed'] == 0, result['observed']
+        assert state['message'] == expected_message, result['observed']
+        assert state['cargo'] == before['state']['cargo'] and state['rewardCount'] == before['state']['rewardCount']
+        assert_neighborhood(after, near_height)
+        entrance_stop(after, target)
         assert not result['pageErrors'], result['pageErrors']
         assert not [error for error in result['httpErrors'] if error['game']], result['httpErrors']
         assert not [error for error in result['failedRequests'] if error['game']], result['failedRequests']

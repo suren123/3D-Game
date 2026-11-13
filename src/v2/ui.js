@@ -111,6 +111,30 @@ class ClickSparkles extends Control {
   }
 }
 
+/** A single icon travels in GUI texture coordinates, independent of screen rebuilds. */
+class CargoTransfer extends Control {
+  constructor() { super('cargo-transfer'); this.isHitTestVisible = false; this.flight = null; }
+  clear() { this.flight = null; this._markAsDirty(); }
+  tick(dt) {
+    if (!this.flight) return;
+    this.flight.time += dt;
+    if (this.flight.time >= .45) this.clear(); else this._markAsDirty();
+  }
+  _draw(ctx) {
+    const f = this.flight;
+    if (!f) return;
+    const t = Math.min(1, f.time / .45), ease = t * t * (3 - 2 * t);
+    const x = f.from.x + (f.to.x - f.from.x) * ease;
+    const y = f.from.y + (f.to.y - f.from.y) * ease - Math.sin(Math.PI * t) * f.arc;
+    const size = f.from.size + (f.to.size - f.from.size) * ease;
+    ctx.save();
+    circle(ctx, x, y, size * .56, '#fffaf0');
+    ToyIcon.prototype._draw.call({ kind: f.goodId, tint: goods[f.goodId]?.color || C.teal,
+      _currentMeasure: { left: x - size / 2, top: y - size / 2, width: size, height: size } }, ctx);
+    ctx.restore();
+  }
+}
+
 function position(control, x, y, width, height) {
   control.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
   control.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
@@ -130,7 +154,7 @@ export function createUI(scene, callbacks = {}) {
     texture.idealHeight = wide ? H : 0;
   };
   fitTexture();
-  const resizeObserver = engine.onResizeObservable.add(fitTexture);
+  const resizeObserver = engine.onResizeObservable.add(() => { fitTexture(); clearCargoTransfer(); });
   texture.rootContainer.isPointerBlocker = false;
   let screen, frame, lastState = null, panel = null, priorPaused = false;
   let mode = 'loading', loadingState = { progress: 0, text: '小镇正在准备，请稍等一会儿。' };
@@ -141,6 +165,12 @@ export function createUI(scene, callbacks = {}) {
   const selectedModels = () => MODEL_CATALOG.filter(model => model.category === modelCategory);
   const selectedModel = () => selectedModels()[modelIndex] || selectedModels()[0];
   const buttons = new Map(), armed = new Set();
+  const cargoIcons = new Map();
+  const cargoTransfer = new CargoTransfer();
+  cargoTransfer.width = '100%'; cargoTransfer.height = '100%'; cargoTransfer.zIndex = 101;
+  texture.addControl(cargoTransfer);
+  let cargoPending = null, cargoLanding = null, cargoHint = null;
+  let loadingSlots = [], requestedUnloadSlot = null;
   const sparkles = new ClickSparkles();
   sparkles.width = '100%'; sparkles.height = '100%'; sparkles.zIndex = 100;
   texture.addControl(sparkles);
@@ -177,7 +207,21 @@ export function createUI(scene, callbacks = {}) {
   canvas?.ownerDocument?.addEventListener('pointerdown', secondPointer, true);
   canvas?.addEventListener('lostpointercapture', cancelPress, true);
   const tick = scene.onBeforeRenderObservable.add(() => {
-    if (!orientationBlocked && !lastState?.paused && !reducedMotion) sparkles.tick(Math.min(engine.getDeltaTime() / 1000, .05));
+    if (!orientationBlocked && !lastState?.paused && !reducedMotion) {
+      const dt = Math.min(engine.getDeltaTime() / 1000, .05);
+      sparkles.tick(dt);
+      if (cargoPending) {
+        const destination = cargoIcons.get(cargoPending.target), to = iconPoint(destination);
+        if (to) {
+          cargoLanding = destination; cargoLanding.alpha = 0;
+          cargoTransfer.flight = { ...cargoPending, to, time: 0, arc: Math.min(30 * (texture.idealRatio || 1), Math.abs(to.y - cargoPending.from.y) * .18) };
+          cargoPending = null; cargoTransfer._markAsDirty();
+        }
+      } else cargoTransfer.tick(dt);
+      if (!cargoPending && !cargoTransfer.flight && cargoLanding) {
+        cargoLanding.alpha = 1; cargoLanding = null; lockCargo(false);
+      }
+    }
   });
 
   function box(parent, name, x, y, w, h, background = C.cream, radius = 20) {
@@ -221,10 +265,61 @@ export function createUI(scene, callbacks = {}) {
     });
     parent.addControl(b); buttons.set(id, b); return b;
   }
+  function iconPoint(control) {
+    const m = control?._currentMeasure;
+    return m?.width > 0 && m.height > 0 ? { x: m.left + m.width / 2, y: m.top + m.height / 2, size: Math.min(m.width, m.height) } : null;
+  }
+  function lockCargo(locked) {
+    if (cargoHint) cargoHint.text = locked ? (cargoPending?.kind === 'unload' || cargoTransfer.flight?.kind === 'unload' ? '正在放回货架…' : '正在放进货格…') : '点货架装入，点货格放回';
+    for (const [id, b] of buttons) if (id.startsWith('load-') || id.startsWith('cargo-slot-')) {
+      b.isEnabled = !locked; b.alpha = locked ? .7 : 1;
+    }
+  }
+  function clearCargoTransfer() {
+    cargoPending = null; cargoTransfer.clear();
+    if (cargoLanding) cargoLanding.alpha = 1;
+    cargoLanding = null; lockCargo(false);
+  }
+  function syncCargoSlots(state) {
+    const capacity = Math.max(1, (cars[state.vehicleId]?.capacity || 1) + (state.capacityBonus || 0));
+    if (lastState?.seed !== state.seed || lastState?.vehicleId !== state.vehicleId) loadingSlots = [];
+    loadingSlots = Array.from({length:capacity}, (_, i) => loadingSlots[i] || null);
+    const remaining = new Map(state.cargo.map(item => [item.goodId, item.quantity]));
+    if (requestedUnloadSlot !== null) {
+      const goodId=loadingSlots[requestedUnloadSlot];
+      const before=lastState?.cargo.find(item=>item.goodId===goodId)?.quantity||0;
+      if ((remaining.get(goodId)||0) === before-1) loadingSlots[requestedUnloadSlot]=null;
+    }
+    for (let i=0;i<loadingSlots.length;i++) {
+      const goodId=loadingSlots[i], count=remaining.get(goodId)||0;
+      if (count>0) remaining.set(goodId,count-1); else loadingSlots[i]=null;
+    }
+    for (const [goodId,count] of remaining) for(let n=0;n<count;n++) {
+      const empty=loadingSlots.indexOf(null);if(empty>=0)loadingSlots[empty]=goodId;
+    }
+  }
+  function changeCargo(type, goodId, source, slotIndex = null) {
+    if (cargoPending || cargoTransfer.flight || lastState?.paused) return;
+    const before = lastState.cargo.reduce((n, item) => n + item.quantity, 0);
+    const oldQuantity = lastState.cargo.find(item => item.goodId === goodId)?.quantity || 0;
+    const from = iconPoint(source);
+    const emptySlot=loadingSlots.indexOf(null);
+    requestedUnloadSlot=slotIndex;
+    send(type, { goodId }); // Rules synchronously render their accepted final cargo.
+    requestedUnloadSlot=null;
+    const after = lastState.cargo.reduce((n, item) => n + item.quantity, 0);
+    const newQuantity = lastState.cargo.find(item => item.goodId === goodId)?.quantity || 0;
+    const delta = type === 'LOAD' ? 1 : -1;
+    if (after !== before + delta || newQuantity !== oldQuantity + delta || !from || reducedMotion) return;
+    const target = type === 'LOAD' ? `cargo-slot-${goodId}-${emptySlot}` : `load-${goodId}`;
+    cargoPending = { kind: type.toLowerCase(), goodId, from, target };
+    lockCargo(true);
+  }
   function send(type, payload = {}) { if (!orientationBlocked) onCommand({ type, ...payload }); }
   function openPanel(nextPanel) {
     // Preserve the pause state from before the first panel, including when the
     // task reminder switches to the destination picker.
+    clearCargoTransfer();
     const firstPanel = !panel;
     if (firstPanel) priorPaused = !!lastState?.paused;
     panel = nextPanel;
@@ -239,7 +334,7 @@ export function createUI(scene, callbacks = {}) {
   function setup() {
     cancelPress();
     screen?.dispose();
-    buttons.clear();
+    buttons.clear(); cargoIcons.clear(); cargoHint = null;
     screen = new Container('ui-screen'); screen.width = '100%'; screen.height = '100%'; screen.zIndex = 1;
     screen.isHitTestVisible = false; texture.addControl(screen);
     frame = new Container('ui-frame'); frame.width = `${W}px`; frame.height = `${H}px`;
@@ -298,42 +393,58 @@ export function createUI(scene, callbacks = {}) {
       button(card, isHint ? 'close-hint' : 'ack', isHint ? '我想起来了' : '记住了，选小车', 12, 610, 272, 82, () => isHint ? closePanel() : send('ACK_BRIEF'), { icon: 'check', fill: C.teal, ink: C.white, size: 25 });
     }
   }
+  function capacitySlots(parent, capacity, x, y, size, gap, cargo = [], interactive = false) {
+    const packed=interactive?loadingSlots:cargo.flatMap(item=>Array(item.quantity).fill(item.goodId));
+    for(let i=0;i<capacity;i++){
+      const goodId=packed[i], slotId=`cargo-slot-${goodId}-${i}`;
+      let art;
+      const cell=interactive && goodId
+        ? button(parent,slotId,'',x+i*(size+gap),y,size,size,()=>changeCargo('UNLOAD',goodId,art,i),{fill:'#d7e8d3',outline:C.teal,radius:7})
+        : box(parent,`capacity-slot-${i}`,x+i*(size+gap),y,size,size,goodId?'#d7e8d3':'#fffaf0',5);
+      cell.thickness=2;cell.color=goodId?C.teal:'#9eafa0';
+      if(goodId){art=icon(cell,goodId,3,3,size-6);if(interactive)cargoIcons.set(slotId,art);}
+
+    }
+  }
   function vehiclePicker() {
     const options = (lastState.mission?.vehicleChoices || VEHICLES.map(v => v.id)).map(id => cars[id]).filter(Boolean);
     const pages = Math.max(1, Math.ceil(options.length / 3));
     vehiclePage = Math.min(vehiclePage, pages - 1);
     const card = sidebar();
-    title(card, '选一辆小车', lastState.message || '小车各有本领，选好后去装东西。', { subtitleHeight: 68 });
+    title(card, '选一辆小车', lastState.message === '选一辆适合今天任务的小车。' ? '选一辆适合任务的小车' : lastState.message || '小车各有本领，选好后去装东西。', { subtitleHeight: 68 });
     options.slice(vehiclePage * 3, vehiclePage * 3 + 3).forEach((car, i) => {
       const b = button(card, `vehicle-${car.id}`, '', 12, 152 + i * 116, 272, 108, () => send('SELECT_VEHICLE', { vehicleId: car.id }), { fill: '#ece8d8' });
       icon(b, car.id, 10, 16, 76);
       text(b, car.name, 100, 10, 164, 40, 27, C.ink, 'left', true);
       const special = { fridge: '冷藏物品', tanker: '送水帮忙', repair: '携带工具', bus: '搭载朋友', taxi: '接送朋友', tractor: '清水和工具', ambulance: '接送朋友', police: '携带工具' }[car.id] || '日常货物';
       text(b, special, 100, 40, 164, 34, 22, C.muted);
-      text(b, `能装 ${car.capacity} 份`, 100, 74, 164, 34, 22, C.muted);
+      const capacity=lastState.capacityBonus<0?1:Math.max(1,car.capacity+(lastState.capacityBonus||0));
+      capacitySlots(b,capacity,100,78,22,5);
     });
     if (pages > 1) button(card, 'next-vehicles', `更多小车 · ${vehiclePage + 1}/${pages}`, 12, 520, 272, 72, () => { vehiclePage = (vehiclePage + 1) % pages; rebuild(); }, { icon: 'arrow', size: 23 });
     helpButton(card);
   }
   function shelf() {
-    const state = lastState, car = cars[state.vehicleId], count = state.cargo.reduce((a, b) => a + b.quantity, 0);
+    const state = lastState, car = cars[state.vehicleId];
     const capacity = state.capacity ?? state.vehicleCapacity ?? Math.max(1, (car?.capacity || 0) + (state.capacityBonus || 0));
     const storedCount = (state.storedCargo || []).reduce((sum, item) => sum + item.quantity, 0);
     const card = sidebar();
-    text(card, '装上要带的东西', 12, 2, 272, 42, 28, C.ink, 'left', true);
-    text(card, state.message || '点物品装一份，点减号取下。', 12, 44, 272, 102, 22, C.muted);
-    text(card, `车上 ${count}/${capacity} 份${storedCount ? `，暂存${storedCount}份` : ''}`, 12, 146, 272, 34, 23, C.teal, 'left', true);
+    text(card, storedCount ? `还有 ${storedCount} 份暂存物品` : '装上要带的东西', 12, 2, 272, 42, 26, C.ink, 'left', true);
+    cargoHint=text(card, '点货架装入，点货格放回', 12, 44, 272, 34, 21, C.muted);
+    text(card, state.message || '想一想要带什么。', 12, 78, 272, 48, 19, C.muted);
+    capacitySlots(card,capacity,12,130,44,1,state.cargo,true);
+
     const choices = (state.shelf || state.mission?.shelf || []).slice(0, 6);
     choices.forEach((id, i) => {
       const x = 12 + (i % 2) * 140, y = 180 + Math.floor(i / 2) * 144;
       const tile = box(card, `shelf-${id}`, x, y, 132, 144, '#eee9d9', 16);
-      const load = button(tile, `load-${id}`, '', 0, 0, 132, 72, () => send('LOAD', { goodId: id }), { fill: '#eee9d9' });
-      icon(load, id, 5, 16, 40); text(load, goods[id]?.name || id, 48, 0, 78, 72, 23, C.ink, 'center', true);
-      const quantity = state.cargo.find(item => item.goodId === id)?.quantity || 0;
-      if (quantity) button(tile, `unload-${id}`, `−  ${quantity} 份`, 0, 72, 132, 72, () => send('UNLOAD', { goodId: id }), { fill: '#dce9d9', size: 24 });
-      else text(tile, '轻点装一份', 4, 82, 124, 48, 22, C.muted, 'center');
+      let art;
+      const load = button(tile, `load-${id}`, '', 0, 0, 132, 132, () => changeCargo('LOAD', id, art), { fill: '#eee9d9' });
+      art=icon(load, id, 42, 8, 48);cargoIcons.set(`load-${id}`,art); text(load, goods[id]?.name || id, 4, 60, 124, 36, 23, C.ink, 'center', true);
+      text(load, '轻点装一份', 4, 98, 124, 30, 19, C.muted, 'center');
     });
     helpButton(card, 620, 132);
+    if (cargoPending || cargoTransfer.flight) lockCargo(true);
     button(card, 'depart', '装好出发', 152, 620, 132, 72, () => send('DEPART'), { fill: C.teal, ink: C.white, size: 24 });
   }
   function getLayout() {
@@ -440,7 +551,7 @@ export function createUI(scene, callbacks = {}) {
     });
     const soundButton = button(card, 'setting-sound', sound ? '声音：开' : '声音：关', 12, 336, 272, 64, () => { sound = !sound; onSound(sound); rebuild(); }, { icon: 'sound' });
     buttons.set('sound', soundButton); // Existing test ID now points to the settings action.
-    button(card, 'reduced-motion', reducedMotion ? '轻柔动态：开' : '轻柔动态：关', 12, 408, 272, 64, () => { reducedMotion = !reducedMotion; if (reducedMotion) { sparkles.bursts = []; sparkles._markAsDirty(); } onReducedMotion(reducedMotion); rebuild(); }, { size: 24 });
+    button(card, 'reduced-motion', reducedMotion ? '轻柔动态：开' : '轻柔动态：关', 12, 408, 272, 64, () => { reducedMotion = !reducedMotion; if (reducedMotion) { clearCargoTransfer(); sparkles.bursts = []; sparkles._markAsDirty(); } onReducedMotion(reducedMotion); rebuild(); }, { size: 24 });
     button(card, 'model-viewer', '模型图鉴', 12, 480, 272, 64, () => openPanel('models'), { size: 25 });
     button(card, 'new-session', '用这个难度去新小镇', 12, 552, 272, 64, () => { panel = null; onNewSession(chosenDifficulty); rebuild(); }, { fill: C.teal, ink: C.white, size: 23 });
     button(card, 'back-to-town', '回到小镇', 12, 628, 272, 64, closePanel, { size: 24 });
@@ -537,6 +648,8 @@ export function createUI(scene, callbacks = {}) {
       const signature = JSON.stringify(state);
       if (lastState?.mission?.id !== state.mission?.id || state.phase !== 'selectVehicle') vehiclePage = 0;
       if (lastState?.seed !== state.seed || (lastState?.phase !== state.phase && state.phase === 'brief')) panel = null;
+      if (state.paused || state.phase !== 'loading' || lastState?.seed !== state.seed || lastState?.vehicleId !== state.vehicleId) clearCargoTransfer();
+      syncCargoSlots(state);
       lastState = state;
       if (!panel) chosenDifficulty = state.difficulty;
       if (signature !== lastSignature) { lastSignature = signature; rebuild(); }
@@ -544,21 +657,26 @@ export function createUI(scene, callbacks = {}) {
     loading(info) { mode = 'loading'; loadingState = { ...loadingState, error: false, ...info }; rebuild(); },
     ready() { mode = 'ready'; rebuild(); },
     setModelIcons(images) { modelIcons = images; rebuild(); },
-    setSettings(settings = {}) { sound = settings.sound ?? sound; historicalCount = settings.historicalCount ?? historicalCount; reducedMotion = settings.reducedMotion ?? reducedMotion; if (reducedMotion) { sparkles.bursts = []; sparkles._markAsDirty(); } rebuild(); },
+    setSettings(settings = {}) { sound = settings.sound ?? sound; historicalCount = settings.historicalCount ?? historicalCount; reducedMotion = settings.reducedMotion ?? reducedMotion; if (reducedMotion) { clearCargoTransfer(); sparkles.bursts = []; sparkles._markAsDirty(); } rebuild(); },
     // Keep the world's callback compatible; destination UI no longer projects
     // labels or leader lines over the actual 3D buildings.
     setPlaces() {},
     setOrientationBlocked(blocked) {
       const next = !!blocked;
       if (next === orientationBlocked) return;
-      orientationBlocked = next; cancelPress(); sparkles.bursts = []; sparkles._markAsDirty(); rebuild();
+      orientationBlocked = next; clearCargoTransfer(); cancelPress(); sparkles.bursts = []; sparkles._markAsDirty(); rebuild();
     },
     cancelInput: cancelPress,
+    getCargoTransfer() {
+      const f=cargoTransfer.flight||cargoPending;
+      return f?{active:true,stage:cargoPending?'layout':'flying',kind:f.kind,goodId:f.goodId,
+        progress:cargoPending?0:Math.min(1,f.time/.45),from:{...f.from},to:f.to?{...f.to}:null}:{active:false};
+    },
     getBounds,
     getLayout,
     getModelView() { return panel === 'models' ? {...selectedModel(),zoom:modelZoom} : null; },
     dispose() {
-      disposed = true; cancelPress(); scene.onBeforeRenderObservable.remove(tick); engine.onResizeObservable.remove(resizeObserver);
+      disposed = true; clearCargoTransfer(); cancelPress(); scene.onBeforeRenderObservable.remove(tick); engine.onResizeObservable.remove(resizeObserver);
       modelIcons = new Map();
       canvas?.removeEventListener('pointermove', cancelOutside, true); canvas?.removeEventListener('pointerup', cancelOutside, true);
       canvas?.removeEventListener('pointercancel', cancelPress, true); canvas?.ownerDocument?.removeEventListener('pointerdown', secondPointer, true); canvas?.removeEventListener('lostpointercapture', cancelPress, true);

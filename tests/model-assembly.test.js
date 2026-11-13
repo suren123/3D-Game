@@ -82,7 +82,7 @@ test('all six building signs contact the actual local roof and the cafe cup sits
   }finally{scene.dispose();engine.dispose();}
 });
 
-test('camp has an entrance facing the fixed camera, grounded matte tent and separated trees/props',async()=>{
+test('camp entrance faces world -Z like the other buildings, with grounded matte tent and clear separated props',async()=>{
   const engine=new NullEngine(),scene=new Scene(engine);
   try{
     const {container,parts}=await load('camp',scene);
@@ -96,21 +96,72 @@ test('camp has an entrance facing the fixed camera, grounded matte tent and sepa
       const props=parts.filter(part=>!tent.includes(part)&&part!==platform);
       assert.ok(props.length>=7);
       for(const prop of props)for(const cloth of tent)assert.ok(!overlap(cloth,prop)||!crosses(cloth,prop),`${prop.name}/${prop.material?.name} cuts through tent triangles`);
+      for(let i=0;i<props.length;i++)for(let j=i+1;j<props.length;j++){
+        const a=props[i],b=props[j];
+        // The cream latch is intentionally attached to the brown crate.
+        if([a.material?.name,b.material?.name].sort().join('/')==='brown/cream')continue;
+        assert.ok(!overlap(a,b)||!crosses(a,b),`${a.name}/${a.material?.name} cuts through ${b.name}/${b.material?.name}`);
+      }
       const radius=Math.min(platform.max.x-platform.min.x,platform.max.z-platform.min.z)/2;
       const feet=tent.flatMap(part=>part.points.filter(point=>Math.abs(point.y-body.min.y)<1e-5));
       assert.ok(feet.every(point=>Math.hypot(point.x,point.z)<=radius+.015),'rotated tent feet must remain on the round base');
-      // Horizontal rays along the actual (+X,-Z) camera direction, beside the
-      // central pole. A closed side panel would be hit before the tent center.
-      const center=tent[0].points.reduce((sum,p)=>sum.add(p),Vector3.Zero()).scale(1/tent[0].points.length);
-      const view=new Vector3(1,0,-1).normalize(),side=new Vector3(1,0,1).normalize(),entranceHits=[];
-      for(const offset of [-.25,.25]){
-        const start=new Vector3(center.x,body.min.y+.5,center.z).add(view.scale(6)).add(side.scale(offset));
-        const ray=new Ray(start,view.scale(-1)),hits=[];
+      const propFeet=props.flatMap(part=>part.points.filter(point=>Math.abs(point.y-platform.max.y)<1e-5));
+      assert.ok(propFeet.every(point=>Math.hypot(point.x,point.z)<=radius+.015),'all prop feet must remain on the round base');
+      // Use actual loader world coordinates: the common frontage is -Z,
+      // which projects towards the lower left in the fixed (+X,-Z) view.
+      // Sample beside the central pole, including the low doorway where a
+      // stool could block the entrance while higher camera rays still pass.
+      const center=body.min.add(body.max).scale(.5),entranceHits=[];
+      for(const height of [.12,.25,.5])for(const offset of [-.25,.25]){
+        const start=new Vector3(center.x+offset,body.min.y+height,center.z-6);
+        const ray=new Ray(start,new Vector3(0,0,1)),hits=[];
         for(const part of tent)for(const triangle of part.triangles){const hit=ray.intersectsTriangle(...triangle);if(hit)hits.push(hit.distance);}
-        assert.ok(hits.length&&Math.min(...hits)>6.1,'the fixed camera must see through the opening to an interior/back surface');
-        entranceHits.push(Math.min(...hits));
+        assert.ok(hits.length&&Math.min(...hits)>6.1,'world -Z rays must enter the opening before hitting an interior/back surface');
+        assert.ok(Math.abs(start.z+Math.min(...hits)-body.max.z)<.01,'the -Z opening must lead to the +Z rear panel');
+        for(const prop of props)for(const triangle of prop.triangles){
+          const hit=ray.intersectsTriangle(...triangle);
+          assert.ok(!hit||hit.distance>6.1,`${prop.name}/${prop.material?.name} blocks the -Z doorway`);
+        }
+        const rearStart=new Vector3(start.x,start.y,center.z+6),rearRay=new Ray(rearStart,new Vector3(0,0,-1)),rearHits=[];
+        for(const part of tent)for(const triangle of part.triangles){const hit=rearRay.intersectsTriangle(...triangle);if(hit)rearHits.push(hit.distance);}
+        assert.ok(rearHits.length&&Math.min(...rearHits)<5,'the opposite +Z gable remains the closed back, not a second assumed entrance');
+        entranceHits.push({height,offset,frontDistance:Math.min(...hits),backDistance:Math.min(...rearHits)});
       }
-      console.log(JSON.stringify({camp:{bounds:body,propCount:props.length,entranceFirstSolidZ:entranceHits}}));
+      console.log(JSON.stringify({camp:{bounds:body,propCount:props.length,worldMinusZEntrance:entranceHits}}));
+    }finally{container.dispose();}
+  }finally{scene.dispose();engine.dispose();}
+});
+
+test('farm has one barn door surface and staggered white braces seated in the panel',async()=>{
+  const engine=new NullEngine(),scene=new Scene(engine);
+  try{
+    const {container,parts}=await load('farm',scene);
+    try{
+      assert.ok(!parts.some(part=>part.material?.name==='navy'),'the generic house door must not remain underneath the barn door');
+      const hitSurfaces=(x,y)=>{
+        const ray=new Ray(new Vector3(x,y,-5),new Vector3(0,0,1)),hits=[];
+        for(const part of parts)for(const triangle of part.triangles){
+          const hit=ray.intersectsTriangle(...triangle);
+          if(hit)hits.push({material:part.material?.name,z:-5+hit.distance});
+        }
+        return hits;
+      };
+      const panelSamples=[];
+      for(const [x,y] of [[.17,.4],[-.17,.9],[.21,.72],[-.21,1.2]]){
+        const hits=hitSurfaces(x,y),panel=hits.filter(hit=>hit.material==='brown'&&hit.z<-1.5);
+        assert.ok(panel.length,'the actual brown barn panel covers the sampled doorway');
+        const front=Math.min(...panel.map(hit=>hit.z));
+        assert.ok(!hits.some(hit=>hit.material!=='brown'&&Math.abs(hit.z-front)<1e-5),'different door materials must not share the same visible plane');
+        panelSamples.push({x,y,front});
+      }
+      const crossing=hitSurfaces(0,1.5).filter(hit=>hit.material==='white');
+      const uniquePlanes=values=>values.sort((a,b)=>a-b).filter((value,i,all)=>!i||value-all[i-1]>1e-5);
+      const fronts=uniquePlanes(crossing.filter(hit=>hit.z<-1.57).map(hit=>hit.z));
+      assert.equal(fronts.length,2,'the two crossing brace fronts must occupy separate depth planes');
+      assert.ok(fronts[1]-fronts[0]>.005,'the crossing timbers need real depth separation rather than duplicate coplanar faces');
+      const backs=uniquePlanes(crossing.filter(hit=>hit.z>-1.55&&hit.z<-1.5).map(hit=>hit.z));
+      assert.equal(backs.length,2,'both braces must extend into the brown door thickness at their crossing');
+      console.log(JSON.stringify({farm:{panelSamples,braceFrontPlanes:fronts,braceBackPlanes:backs}}));
     }finally{container.dispose();}
   }finally{scene.dispose();engine.dispose();}
 });
