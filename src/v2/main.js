@@ -9,7 +9,7 @@ import { createWorld } from './world.js';
 import { createUI } from './ui.js';
 import { createAudio } from './audio.js';
 import { preloadResources,RESOURCE_MANIFEST } from './resources.js';
-import { missionSpeech } from './dialogue.js';
+import { missionSpeech,feedbackSpeech } from './dialogue.js';
 import './style.css';
 
 const canvas=document.querySelector('#game');
@@ -147,7 +147,8 @@ async function boot(){
         if(event.type==='reward'){world.effect('celebrate');audio.speak(['reward']);}
         if(event.type==='feedback'){
           audio.effect(event.kind==='success'?'success-sfx':'soft');
-          if(!events.some(x=>['reward','event'].includes(x.type)))audio.speak([event.kind==='success'?'success':'gentle']);
+          const clips=feedbackSpeech(event.feedbackCode);
+          if(clips.length&&!events.some(x=>['reward','event','travel'].includes(x.type)))audio.speak(clips);
         }
         if(event.type==='event'){world.effect(state.event.id);audio.speak([`event-${state.event.id}`]);}
       }
@@ -173,7 +174,7 @@ window.addEventListener('pageshow',fitViewport);
 document.querySelector('#graphics-error button').addEventListener('click',()=>location.reload());
 if(testMode)Object.defineProperty(window,'__townTest',{value:Object.freeze({
   snapshot:()=>({state:game.getState(),ready,started,resources:resources?.stats,audio:audio?.stats(),world:world?.getState(),
-    bounds:ui?.getBounds(),places:world?.projectPlaces(),layout:ui?.getLayout?.(),modelView:ui?.getModelView(),cargoTransfer:ui?.getCargoTransfer?.(),orientationBlocked,
+    bounds:ui?.getBounds(),ui:ui?.getSnapshot?.(),places:world?.projectPlaces(),layout:ui?.getLayout?.(),modelView:ui?.getModelView(),cargoTransfer:ui?.getCargoTransfer?.(),orientationBlocked,
     standalone:window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true,
     settings:{...settings},frames:frameCount,manifest:RESOURCE_MANIFEST,
     vehicleMaterials:scene?.meshes.filter(m=>m.name.startsWith(`${game.getState().vehicleId}:`)&&m.material).map(m=>({name:m.name,lights:m._lightSources?.length,

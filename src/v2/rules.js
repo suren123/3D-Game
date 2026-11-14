@@ -1,4 +1,4 @@
-import { GOODS, VEHICLES, PLACES, THEMES, DIFFICULTIES, TEMPLATES, EVENTS } from './catalog.js';
+import { GOODS, VEHICLES, PLACES, THEMES, DIFFICULTIES, TEMPLATES } from './catalog.js';
 import { createTownLayout } from './town-layout.js';
 
 const copy = value => JSON.parse(JSON.stringify(value));
@@ -76,7 +76,7 @@ function missionFor(seed, difficulty, round, previousTemplateIds) {
   const random = seededRandom(seed ^ Math.imul(round + 1, 0x9e3779b1) ^ 0x5441534b);
   const available = TEMPLATES.filter(template => !previousTemplateIds.includes(template.id));
   const template = available[Math.floor(random() * available.length)];
-  const count = difficulty === 'easy' ? 1 : difficulty === 'normal' ? 2 : 3;
+  const count = difficulty === 'easy' ? 1 : 2;
   const pool = shuffled(template.goods, random);
   // Keep the errand's defining item while retaining the existing random draw
   // count and variety in its other slots. Names, step counts and speech stay finite.
@@ -87,19 +87,21 @@ function missionFor(seed, difficulty, round, previousTemplateIds) {
   const destinations = shuffled(template.places, random);
   const steps = selectedGoods.map((goodId, index) => ({
     goodId, quantity: difficulty === 'easy' ? 1 + Math.floor(random() * 2) : 1,
-    placeId: destinations[index % destinations.length],
+    placeId: destinations[difficulty === 'challenge' ? index : 0],
   }));
   const requiredTags = [...new Set(steps.map(step => goods[step.goodId].tag))];
-  const suitable = VEHICLES.filter(vehicle => requiredTags.every(tag => vehicle.supports.includes(tag)));
-  const preferred = suitable[Math.floor(random() * suitable.length)];
-  const choiceCount = difficulty === 'easy' ? 2 : difficulty === 'normal' ? 3 : 6;
-  const alternatives = shuffled(VEHICLES.filter(vehicle => vehicle.id !== preferred.id), random).slice(0, choiceCount - 1);
-  const distractors = shuffled(GOODS.filter(good => !selectedGoods.includes(good.id)), random).slice(0, difficulty === 'easy' ? 2 : 3);
+  const totalQuantity = steps.reduce((sum, step) => sum + step.quantity, 0);
+  const suitable = VEHICLES.filter(vehicle => vehicle.capacity >= totalQuantity && requiredTags.every(tag => vehicle.supports.includes(tag)));
+  const vehicleChoices = shuffled(suitable, random).slice(0, 2).map(vehicle => vehicle.id);
+  const distractors = shuffled(GOODS.filter(good => !selectedGoods.includes(good.id)), random).slice(0, 2);
+  const shelf = shuffled([...selectedGoods, ...distractors.map(good => good.id)], random);
+  const targets = [...new Set(steps.map(step => step.placeId))];
+  const placeDistractors = shuffled(PLACES.filter(place => place.id !== 'depot' && !targets.includes(place.id)), random).slice(0, 4 - targets.length);
   return {
     id: `${seed}-${round}-${template.id}`, templateId: template.id, title: template.title,
-    steps, ordered: difficulty === 'challenge', requiredTags,
-    shelf: shuffled([...selectedGoods, ...distractors.map(good => good.id)], random),
-    vehicleChoices: shuffled([preferred, ...alternatives], random).map(vehicle => vehicle.id),
+    steps, ordered: false, requiredTags,
+    shelf, shelfChoices: [...shelf], vehicleChoices,
+    destinationChoices: shuffled([...targets, ...placeDistractors.map(place => place.id)], random),
   };
 }
 
@@ -111,7 +113,7 @@ function initialState(seed, difficulty, saved = {}) {
   return {
     seed, difficulty, map: generateMap(seed), phase: 'brief', round: 0,
     mission: missionFor(seed, difficulty, 0, []), vehicleId: 'van', location: 'depot',
-    cargo: [], storedCargo: [], completed: [], delivered: {}, message: '先听一听，再记住今天的小任务。', paused: false,
+    cargo: [], storedCargo: [], completed: [], delivered: {}, message: '听任务', feedbackCode: 'brief', paused: false,
     event: null, eventUsed: false, eventHistory: [], history: [], rewardCount,
     blockedEdges: [], capacityBonus: 0, shortageGoodId: null, supplyLocations: ['depot'],
     vehicleHealth: 'ready', currentDestination: null,
@@ -124,9 +126,10 @@ export function createGame({ seed = 1, difficulty = 'easy', saved = {} } = {}) {
   const listeners = new Set();
 
   function getState() { return copy(state); }
-  function feedback(events, text, kind = 'gentle') {
+  function feedback(events, text, kind = 'gentle', feedbackCode = 'arrived') {
     state.message = text;
-    events.push({ type: 'feedback', kind, text });
+    state.feedbackCode = feedbackCode;
+    events.push({ type: 'feedback', kind, text, feedbackCode });
   }
   function capacity() { return Math.max(1, vehicles[state.vehicleId].capacity + state.capacityBonus); }
   function cargoCount() { return state.cargo.reduce((sum, item) => sum + item.quantity, 0); }
@@ -138,54 +141,21 @@ export function createGame({ seed = 1, difficulty = 'easy', saved = {} } = {}) {
     state.phase = 'reward';
     state.rewardCount += 1;
     state.history.push({ missionId: state.mission.id, templateId: state.mission.templateId, round: state.round });
-    feedback(events, '你把每一份心意都送到了，真棒！', 'success');
+    feedback(events, '完成啦', 'success', 'reward');
     events.push({ type: 'reward' });
   }
 
-  function beginEvent(events, timing = 'delivery') {
-    if (state.difficulty === 'easy' || state.eventUsed || state.round !== 0 || remaining().length === 0) return;
-    const random = seededRandom(state.seed ^ 0x45564e54);
-    let definition = EVENTS[Math.floor(random() * EVENTS.length)];
-    // A stock shortage matters before packing; already packed cargo stays safe.
-    // The other three events keep their existing first-delivery timing.
-    if (timing === 'loading' ? definition.id !== 'shortage' : definition.id === 'shortage') return;
-    const shortageStep = definition.id === 'shortage' ? remaining().find(step =>
-      goods[step.goodId].tag !== 'passenger' &&
-      (state.cargo.find(item => item.goodId === step.goodId)?.quantity || 0) < step.quantity - (state.delivered[step.index] || 0)) : null;
-    if (definition.id === 'shortage' && !shortageStep) return;
-    // One remaining unit cannot create a meaningful choice between one trip and several.
-    if (definition.id === 'capacity' && (remaining().length < 2 || cargoCount() < 2)) {
-      const alternatives = EVENTS.filter(event => !['capacity', 'shortage'].includes(event.id));
-      definition = alternatives[Math.floor(random() * alternatives.length)];
+  function placeFeedback(events) {
+    const atPlace = state.mission.steps.map((step, index) => ({ ...step, index })).filter(step => step.placeId === state.location);
+    const pending = atPlace.filter(step => !state.completed.includes(step.index));
+    if (pending.length) {
+      const missing = pending.some(step => (state.cargo.find(item => item.goodId === step.goodId)?.quantity || 0) < step.quantity - (state.delivered[step.index] || 0));
+      feedback(events, missing ? '去补货' : '交货吧', 'gentle', missing ? 'missing-cargo' : 'arrived');
+    } else if (state.supplyLocations.includes(state.location)) {
+      feedback(events, '装货吧', 'gentle', 'supply');
+    } else {
+      feedback(events, atPlace.length ? '送过啦' : '再想想', 'gentle', atPlace.length ? 'place-done' : 'wrong-place');
     }
-    state.eventUsed = true;
-    state.event = { id: definition.id, title: definition.title, message: definition.message, options: copy(definition.options) };
-    state.phase = 'event';
-    state.message = definition.message;
-    if (definition.id === 'roadworks') {
-      const from = state.map.places.find(place => place.id === state.location).nodeId;
-      const to = state.map.places.find(place => place.id === remaining()[0].placeId).nodeId;
-      const route = nodeRoute(state.map, from, to);
-      const routeEdges = route.slice(1).map((node, i) => [route[i], node]);
-      const candidates = [...routeEdges, ...state.map.edges];
-      // Every parked vehicle and destination sits midway along a frontage.
-      // Reserve these roads so a full-edge closure cannot strand a vehicle or
-      // put a barrier across a landmark entrance. Other roads retain a detour.
-      const frontages = new Set(state.map.places.map(place => edgeKey(place.lot.accessEdge)));
-      const blocked = candidates.find(edge => !frontages.has(edgeKey(edge)) &&
-        state.map.nodes.every(node => nodeRoute(state.map, from, node.id, [edge]).length));
-      if (blocked) state.blockedEdges = [blocked];
-    } else if (definition.id === 'capacity') {
-      state.capacityBonus = 1 - vehicles[state.vehicleId].capacity;
-    } else if (definition.id === 'shortage') {
-      state.shortageGoodId = shortageStep.goodId;
-    } else if (definition.id === 'repair') {
-      state.vehicleHealth = 'soft-tyre';
-      state.event.progress = 0;
-      state.event.message = `${definition.message} 打气进度：0/3。`;
-      state.message = state.event.message;
-    }
-    events.push({ type: 'event', id: definition.id });
   }
 
   function dispatch(command) {
@@ -204,31 +174,33 @@ export function createGame({ seed = 1, difficulty = 'easy', saved = {} } = {}) {
       case 'ACK_BRIEF':
         if (state.phase !== 'brief') { accepted = false; break; }
         state.phase = 'selectVehicle';
-        state.message = '选一辆适合今天任务的小车。';
+        feedback(events, '选小车', 'gentle', 'choose-vehicle');
         break;
       case 'SELECT_VEHICLE': {
         if (!['selectVehicle', 'loading'].includes(state.phase) || state.location !== 'depot' || !state.mission.vehicleChoices.includes(command.vehicleId)) { accepted = false; break; }
         const selected = vehicles[command.vehicleId];
         if (!state.mission.requiredTags.every(tag => selected.supports.includes(tag))) {
-          feedback(events, '这辆车不太适合这次的物品。再试试另一辆吧！'); break;
+          accepted = false;
+          feedback(events, '换辆车', 'gentle', 'choose-vehicle'); break;
         }
         const selectedCapacity = state.capacityBonus < 0 ? 1 : Math.max(1, selected.capacity + state.capacityBonus);
         if (cargoCount() > selectedCapacity) {
-          feedback(events, '车上物品有点多。先放下一些，再换车吧。'); break;
+          accepted = false;
+          feedback(events, '放回些', 'gentle', 'capacity-full'); break;
         }
         state.vehicleId = selected.id;
         if (state.capacityBonus < 0) state.capacityBonus = 1 - selected.capacity;
         state.phase = 'loading';
-        state.message = '记得要带什么吗？点一下放一件，再点车上的物品可以放回。';
-        beginEvent(events, 'loading');
+        feedback(events, '装货吧', 'gentle', 'vehicle-ready');
         break;
       }
       case 'LOAD': {
         if (state.phase !== 'loading' || !state.mission.shelf.includes(command.goodId)) { accepted = false; break; }
         if (state.shortageGoodId === command.goodId && state.location === 'depot') {
-          feedback(events, '这个货架在补货，去车库的备用箱看看吧。'); break;
+          accepted = false;
+          feedback(events, '去补货', 'gentle', 'missing-cargo'); break;
         }
-        if (cargoCount() >= capacity()) { feedback(events, '小车已经坐满啦。可以放回一件，或者先送这一车。'); break; }
+        if (cargoCount() >= capacity()) { accepted = false; feedback(events, '装满啦', 'gentle', 'capacity-full'); break; }
         const item = state.cargo.find(item => item.goodId === command.goodId);
         if (item) item.quantity++; else state.cargo.push({ goodId: command.goodId, quantity: 1 });
         const stored = state.location === 'depot' && state.storedCargo.find(item => item.goodId === command.goodId);
@@ -236,7 +208,7 @@ export function createGame({ seed = 1, difficulty = 'easy', saved = {} } = {}) {
           stored.quantity--;
           state.storedCargo = state.storedCargo.filter(item => item.quantity > 0);
         }
-        state.message = stored ? '从仓库取回啦。准备好就出发！' : '放好啦。准备好就出发！';
+        feedback(events, '装好啦', 'gentle', 'loaded');
         events.push({ type: 'cargo' });
         break;
       }
@@ -246,28 +218,47 @@ export function createGame({ seed = 1, difficulty = 'easy', saved = {} } = {}) {
         if (!item) { accepted = false; break; }
         item.quantity--;
         state.cargo = state.cargo.filter(item => item.quantity > 0);
-        state.message = '放回去了，慢慢想一想。';
+        feedback(events, '放回啦', 'gentle', 'unloaded');
         events.push({ type: 'cargo' });
         break;
       }
       case 'DEPART':
         if (state.phase !== 'loading') { accepted = false; break; }
+        if (!cargoCount()) { accepted = false; feedback(events, '先装货', 'gentle', 'empty-cargo'); break; }
         state.phase = state.location === 'depot' ? 'explore' : 'delivery';
-        state.message = state.location === 'depot' ? '点一个地点，小车会自己开过去。' : '补好货啦。可以交出物品，也可以去下一个地方。';
+        feedback(events, '去哪里', 'gentle', 'choose-place');
         break;
       case 'TRAVEL': {
-        if (!['explore', 'delivery', 'loading'].includes(state.phase) || !places[command.placeId]) { accepted = false; break; }
-        if (command.placeId === state.location) {
-          updateLocationPhase();
-          state.message = state.phase === 'loading' ? '还可以补货或放回物品。' : '已经到了。选一件要交出的物品吧。';
+        if (state.phase === 'moving') {
+          accepted = false;
+          feedback(events, '开车中', 'gentle', 'moving');
           break;
         }
-        if (state.vehicleHealth === 'soft-tyre') { feedback(events, '先照顾好轮胎，再出发。'); break; }
+        if (!['explore', 'delivery', 'loading'].includes(state.phase) || !places[command.placeId]) { accepted = false; break; }
+        const supply = state.supplyLocations.includes(command.placeId);
+        const pending = remaining().some(step => step.placeId === command.placeId);
+        if (!supply && !pending) {
+          accepted = false;
+          const done = state.mission.steps.some(step => step.placeId === command.placeId);
+          feedback(events, done ? '送过啦' : '再想想', 'gentle', done ? 'place-done' : 'wrong-place');
+          break;
+        }
+        // Recovery sources remain reachable even after the last loaded unit is delivered.
+        if (!supply && !cargoCount()) {
+          accepted = false;
+          feedback(events, '先装货', 'gentle', 'empty-cargo'); break;
+        }
+        if (command.placeId === state.location) {
+          updateLocationPhase();
+          placeFeedback(events);
+          break;
+        }
+        if (state.vehicleHealth === 'soft-tyre') { accepted = false; feedback(events, '修小车', 'gentle', 'moving'); break; }
         const route = findRoute(state.map, state.location, command.placeId, state.blockedEdges);
-        if (!route.length) { feedback(events, '这条路暂时不通。我们可以换一个办法。'); break; }
+        if (!route.length) { accepted = false; feedback(events, '换条路', 'gentle', 'wrong-place'); break; }
         state.phase = 'moving';
         state.currentDestination = command.placeId;
-        state.message = `正在前往${places[command.placeId].name}。`;
+        feedback(events, '出发啦', 'gentle', 'moving');
         events.push({ type: 'travel', route, placeId: command.placeId });
         break;
       }
@@ -276,27 +267,31 @@ export function createGame({ seed = 1, difficulty = 'easy', saved = {} } = {}) {
         state.location = state.currentDestination;
         state.currentDestination = null;
         updateLocationPhase();
-        state.message = state.phase === 'loading' ? '到了，记得还有什么要带吗？' : '到了，想一想这里需要哪件物品。';
+        placeFeedback(events);
         break;
       case 'DELIVER': {
         if (state.phase !== 'delivery') { accepted = false; break; }
-        const item = state.cargo.find(item => item.goodId === command.goodId);
-        if (!item) { accepted = false; break; }
-        const outstanding = remaining();
-        const step = outstanding.find(step => step.goodId === command.goodId && step.placeId === state.location);
-        if (!step || (state.mission.ordered && step.index !== outstanding[0]?.index)) {
-          feedback(events, state.mission.ordered ? '再想想先做哪一步。可以免费再听一次！' : '这里好像需要别的东西。可以再看看任务卡！');
-          break;
+        const atPlace = state.mission.steps.map((step, index) => ({ ...step, index })).filter(step => step.placeId === state.location);
+        const pending = atPlace.filter(step => !state.completed.includes(step.index));
+        if (!pending.length) {
+          accepted = false;
+          feedback(events, atPlace.length ? '送过啦' : '再想想', 'gentle', atPlace.length ? 'place-done' : 'wrong-place'); break;
         }
+        const step = pending.find(step => step.goodId === command.goodId);
+        if (!step) { accepted = false; feedback(events, '再想想', 'gentle', 'wrong-item'); break; }
+        const item = state.cargo.find(item => item.goodId === command.goodId);
+        if (!item) { accepted = false; feedback(events, '去补货', 'gentle', 'missing-cargo'); break; }
         item.quantity--;
         state.cargo = state.cargo.filter(item => item.quantity > 0);
         state.delivered[step.index] = (state.delivered[step.index] || 0) + 1;
         const finishedStep = state.delivered[step.index] >= step.quantity;
         if (finishedStep) state.completed.push(step.index);
-        feedback(events, finishedStep ? '送对啦，谢谢你的小心照顾！' : '送对了一件，再想想还差几件。', 'success');
         events.push({ type: 'cargo' });
         if (remaining().length === 0) completeMission(events);
-        else if (finishedStep) beginEvent(events);
+        else {
+          const nextStop = !remaining().some(step => step.placeId === state.location);
+          feedback(events, nextStop ? '下一站' : '送对啦', 'success', nextStop ? 'next-stop' : 'delivered');
+        }
         break;
       }
       case 'RESOLVE_EVENT': {
@@ -344,7 +339,7 @@ export function createGame({ seed = 1, difficulty = 'easy', saved = {} } = {}) {
         if (state.phase !== 'reward') { accepted = false; break; }
         if (state.round >= 2) {
           state.phase = 'sessionComplete';
-          state.message = '今天帮助了好多朋友！可以休息，也可以去新的小镇。';
+          feedback(events, '休息啦', 'success', 'session-complete');
           break;
         }
         state.round++;
@@ -356,13 +351,13 @@ export function createGame({ seed = 1, difficulty = 'easy', saved = {} } = {}) {
         // Temporary problems belong to this errand, not the next child's new instructions.
         state.blockedEdges = []; state.capacityBonus = 0; state.shortageGoodId = null;
         state.supplyLocations = ['depot']; state.vehicleHealth = 'ready';
-        state.message = '新任务来啦。先听一听，再记住。';
+        feedback(events, '听任务', 'gentle', 'brief');
         break;
       }
       default:
         accepted = false;
     }
-    if (accepted) {
+    if (accepted || events.length) {
       for (const listener of [...listeners]) listener(getState(), copy(events));
     }
     return { accepted, events: copy(events), state: getState() };

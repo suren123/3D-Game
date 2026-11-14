@@ -48,9 +48,9 @@ export const THEMES = freeze([
 ]);
 
 export const DIFFICULTIES = freeze([
-  { id: 'easy', name: '轻松出发', icon: '●', color: '#a7d3b2', description: '记住一种物品，送到一个地方。' },
-  { id: 'normal', name: '记忆小司机', icon: '●●', color: '#f2cd82', description: '记住两种物品和两个地方。' },
-  { id: 'challenge', name: '勇敢小队长', icon: '●●●', color: '#c6b5e3', description: '按顺序完成三步，遇到小变化再想想。' },
+  { id: 'easy', name: '轻松', icon: '●', color: '#a7d3b2', description: '记住一种物品，送到一个地方。' },
+  { id: 'normal', name: '记忆', icon: '●●', color: '#f2cd82', description: '记住两种物品，送到同一个地方。' },
+  { id: 'challenge', name: '配对', icon: '●●●', color: '#c6b5e3', description: '将两种物品送到两个地方，先去哪边都可以。' },
 ]);
 
 export const TEMPLATES = freeze([

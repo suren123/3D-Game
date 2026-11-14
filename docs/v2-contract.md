@@ -1,6 +1,6 @@
-# V2 实施合同（更新至2026-11-13）
+# V2 实施合同（更新至2026-11-14）
 
-用户批准：iPad Air 4 横屏；Babylon.js + 官方 GUI、单个可见 Canvas；全量预加载后离线游玩；10 车 / 12 物品 / 8 任务模板 / 9 地点 / 3 地图主题 / 4 可恢复事件；种子地图每轮固定、每轮 3 单；三个明确难度；不计时、不扣分。首个小闭环后扩展完整内容。
+用户批准：iPad Air 4 横屏；Babylon.js + 官方 GUI、单个可见 Canvas；全量预加载后离线游玩；10 车 / 12 物品 / 8 任务模板 / 9 地点 / 3 地图主题；默认不触发复杂事件；种子地图每轮固定、每轮 3 单；三个明确难度；不计时、不扣分。首个小闭环后扩展完整内容。
 
 当前协作写入归属与完成情况以 [任务状态](task-state.md) 为准，以下文件分工保留初始模块边界。
 
@@ -41,15 +41,15 @@ setMap 必须清理上一地图实例/粒子，复用材质与容器；车辆真
 
 `createUI(scene,{onCommand,onSpeak,onSound,onOverview,onReducedMotion,onNewSession})` → `{render(state),loading({progress,text,error}),ready(),setSettings({sound,reducedMotion}),getBounds(),dispose()}`。
 
-使用 `AdvancedDynamicTexture.CreateFullscreenUI` 单可见Canvas；1180×820逻辑尺度自适应。主要游戏GUI按钮>=72px，设置/图鉴>=64px，字22–28px；支持遮挡防穿透、按下抬起同区才接受、移出/取消/第二指不误触。loading→ready 顶层开始按钮 `{type:'START'}` 由 root 截获并解锁 AudioContext；显示 brief；ACK_BRIEF 进选车、装货、驾驶、交付。进入主游戏后再听/再看免费，不能一直展示答案；库存显示已选货非正确答案；选择地点显示所有地方名称而非高亮正确目标。ui 自己可维护帮助/货架/提示/设置面板状态，暂停覆盖层、声音/减少动态/难度/新地图入口。
+使用 `AdvancedDynamicTexture.CreateFullscreenUI` 单可见Canvas；1180×820逻辑尺度自适应。主要游戏GUI按钮>=72px，设置/图鉴>=64px，字22–28px；支持遮挡防穿透、按下抬起同区才接受、移出/取消/第二指不误触。loading→ready 顶层开始按钮 `{type:'START'}` 由 root 截获并解锁 AudioContext；显示 brief；ACK_BRIEF 进选车、装货、驾驶、交付。进入主游戏后再听/再看免费，不能一直展示答案；库存显示已选货非正确答案；选择地点显示最多四张大图卡，包含全部目标与干扰，不高亮正确目标。ui 自己可维护帮助/货架/提示/设置面板状态，暂停覆盖层、声音/减少动态/难度/新地图入口。
 
-onSpeak() 重放当前完整任务，onSound(bool)，onReducedMotion(bool)，onNewSession(difficulty)；新地图 seed由root生成。getBounds() 返回可见可用按钮 `{id:{x,y,width,height}}`，浏览器测试只按坐标点，禁止测试hook作弊改状态。稳定按钮 ID：start, ack, vehicle-ID, load-ID, unload-ID, depart, place-ID, deliver-ID, next, hint, listen, pause, resume, sound, settings, difficulty-ID, new-session, event-OPTIONID。GUI位置应根据实际control measure转换到 CSS px。
+onSpeak() 重放尚未完成的任务及剩余数量，onSound(bool)，onReducedMotion(bool)，onNewSession(difficulty)；新地图 seed由root生成。getBounds() 返回可见可用按钮 `{id:{x,y,width,height}}`，浏览器测试只按坐标点，禁止测试hook作弊改状态。稳定按钮 ID：start, ack, vehicle-ID, load-ID, unload-ID, depart, place-ID, deliver-ID, next, hint, listen, pause, resume, sound, settings, difficulty-ID, new-session, event-OPTIONID。GUI位置应根据实际control measure转换到 CSS px。
 
 ## 主 Agent 整合
 
 新入口 `src/v2/main.js`。所有模型/纹理、所有音效与有限中文语句词组在开始前完成下载、解析、解码和渲染预热，失败有 Canvas 重试提示。无运行时在线 TTS/远端字体/CDN。独立美术RNG不影响玩法。保存 v2 key并迁移 v1声音和历史贴纸，保留 v1 key。
 
-云端 Chromium 实际 Canvas 点击、1000 seeds、正确与错误流程、4事件、离线换图换任务、长按/多指/暂停/旋转测试；iPad 真机帧率仍待实测。稳定版 tag `v1-stable-before-canvas`，开发分支 `feat/canvas-town-v2`。
+云端 Chromium 实际 Canvas 点击、1000 seeds、正确与错误恢复流程、三档三单、离线换图换任务、长按/多指/暂停/旋转测试；iPad 真机帧率仍待实测。稳定版 tag `v1-stable-before-canvas`，开发分支 `feat/canvas-town-v2`。
 
 ## 模型图鉴与素材身份
 
@@ -64,3 +64,13 @@ Rules保留`place.nodeId/x/z`与原来的图节点寻路。World通过`parking-r
 `initialParkingPose(map,placeId)`返回`{x,z,yaw,nodeId,edge}`；`planParkingRoute(map,nodeRoute,{position,heading},{placeId,blockedEdges})`返回`{points,stop,removedStartNode,headingOffset:0}`。将当前与目标车位插入所属路段，避免先去错误的逻辑路口；封路事件保留所有地点入口道路，不把围栏放在实际车位上。Motion首尾边保留完整2.5米转弯半径，中间相邻转弯保留不交叠约束。
 
 道路/实际车身包络检查覆盖平移行驶、连续圆弧与停稳姿态；原有起步180°原地缓慢调向仍可能有车身外摆，不把本轮适配称作完整碰撞或三点调头系统。
+
+## 图片操作台接口（2026-11-14）
+
+`mission.shelfChoices`为`shelf`别名，3或4项；`vehicleChoices`至多两辆且任务完全适配；`destinationChoices`四项包含全部目标。`ordered=false`，easy一种物品一站1–2件，normal两种物品同站各一件，challenge两种物品不同站各一件。历史event字段与处理分支保留兼容，但没有默认触发器或新增事件模式。
+
+`state.feedbackCode`区分wrong-place/place-done/missing-cargo/wrong-item/empty-cargo/capacity-full等，拒绝的有意义操作仍通知订阅者用于显示反馈。TRAVEL到无任务地点、已完成地点或空车到配送站均拒绝，仓库为恢复例外。反馈文案不作为状态判断条件。
+
+UI维护稳定的逐件货格顺序；真正数量仍由Rules拥有。`cargo-slot-GOOD-INDEX`放回，`deliver-slot-GOOD-INDEX`交付；`deliver-GOOD`仅为首个匹配格的测试兼容别名。`return-depot`直达仓库；`destinations`只在到站显示，打开四卡选择页。`getSnapshot()`只读返回文本、图片与格子真实CSS坐标，不暴露写状态接口。成人图鉴不受儿童短标签规则限制。
+
+任务图保留原始物品图片并逐件打勾；语音只说尚需交付数量。装入/放回/交付根据状态实际增减启动动画，拒绝动作仅有轻微回弹。奖励页保持刚交付建筑的位置，最后一件动画有可见终点。

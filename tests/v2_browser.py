@@ -7,10 +7,11 @@ ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'artifacts'/'v2'; URL=os.environ.get('TOWN_URL','http://127.0.0.1:5173/')
 VEHICLES=json.loads(subprocess.check_output(['node','--input-type=module','-e',"import{VEHICLES}from'./src/v2/catalog.js';console.log(JSON.stringify(VEHICLES))"],cwd=ROOT,text=True))
 checks=[]
-def is_game_request(request):
+def is_game_url(url):
  # Browsers may inspect installation metadata after play begins; these files
  # are not requested by gameplay and never block a vehicle, voice or texture.
- return not request.url.split('?')[0].endswith(('/manifest.webmanifest','/icons/apple-touch-icon.png','/icons/icon-192.png','/icons/icon-512.png','/icons/favicon-32.png'))
+ return not url.split('?')[0].endswith(('/manifest.webmanifest','/icons/apple-touch-icon.png','/icons/icon-192.png','/icons/icon-512.png','/icons/favicon-32.png'))
+def is_game_request(request):return is_game_url(request.url)
 async def snap(p):return await p.evaluate('window.__townTest.snapshot()')
 async def state(p):return (await snap(p))['state']
 def ok(name):checks.append(name);print('PASS',name,flush=True)
@@ -18,13 +19,13 @@ async def center(p,key):
  await p.wait_for_function('(k)=>!!window.__townTest?.snapshot().bounds?.[k]',arg=key,timeout=15000)
  b=(await snap(p))['bounds'][key];return b['x']+b['width']/2,b['y']+b['height']/2
 async def click(p,key):
- cargo_action=key.startswith(('load-','unload-','cargo-slot-'))
+ cargo_action=key.startswith(('load-','unload-','cargo-slot-','deliver-'))
  if key.startswith('unload-'):
   prefix='cargo-slot-'+key[len('unload-'): ]+'-'
   await p.wait_for_function('(prefix)=>Object.keys(window.__townTest.snapshot().bounds).some(k=>k.startsWith(prefix))',arg=prefix,timeout=15000)
   key=next(k for k in (await snap(p))['bounds'] if k.startswith(prefix))
  if key in ('listen','destinations') and key not in (await snap(p))['bounds']:
-  # These secondary actions now live inside the child's single help panel.
+  # Listening lives in the reminder; destination choice has a direct button.
   await click(p,'hint')
  if key.startswith('vehicle-'):
   await p.wait_for_function('Object.keys(window.__townTest.snapshot().bounds).some(k=>k.startsWith("vehicle-"))')
@@ -38,7 +39,10 @@ async def click(p,key):
 # Long routes need extra wall time on the cloud's software renderer.
 async def phase(p,value):await p.wait_for_function('(v)=>window.__townTest.snapshot().state.phase===v',arg=value,timeout=180000)
 async def travel(p,place):
- await click(p,'destinations');await click(p,'destination-'+place)
+ if place=='depot':
+  await click(p,'return-depot')
+ else:
+  await click(p,'destinations');await click(p,'destination-'+place)
  await p.wait_for_function('window.__townTest.snapshot().state.phase!=="moving"',timeout=180000)
  assert (await state(p))['location']==place
 async def prepare(p,event_choices=None):
